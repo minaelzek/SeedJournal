@@ -1,0 +1,457 @@
+.sj-garden-scene,
+.sj-garden-fallback {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  touch-action: pan-x pan-y;
+}
+
+.sj-garden-scene canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  outline: none;
+}
+
+.sj-garden-fallback {
+  display: grid;
+  place-items: center;
+  background:
+    radial-gradient(
+      circle at 70% 28%,
+      color-mix(in srgb, var(--sj-color-moon) 12%, transparent),
+      transparent 24%
+    ),
+    linear-gradient(
+      to bottom,
+      var(--sj-color-void),
+      var(--sj-color-indigo)
+    );
+}
+
+.sj-garden-fallback svg {
+  width: min(92vw, 51rem);
+  max-height: 88vh;
+  overflow: visible;
+  filter: drop-shadow(
+    0 1.5rem 3.5rem color-mix(in srgb, var(--sj-color-void) 64%, transparent)
+  );
+}
+
+.sj-garden-fallback__moon {
+  fill: color-mix(in srgb, var(--sj-color-moon) 88%, transparent);
+}
+
+.sj-garden-fallback__branches {
+  fill: none;
+  stroke: var(--sj-color-trunk);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sj-garden-fallback__foliage circle {
+  fill: var(--sj-color-blossom);
+}
+
+.sj-garden-fallback__foliage circle[data-kind="leaf"] {
+  fill: var(--sj-color-leaf);
+}
+
+.sj-garden-fallback__foliage circle[data-kind="luminous-blossom"] {
+  fill: var(--sj-color-blossom-light);
+  filter: drop-shadow(0 0 0.5rem var(--sj-color-blossom));
+}
+
+.sj-garden-fallback__ground {
+  fill: color-mix(in srgb, var(--sj-color-void) 58%, transparent);
+}
+
+.sj-memory-explore {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sj-space-2, 0.5rem);
+  padding: 0 var(--sj-space-3, 0.75rem);
+  border: 1px solid var(--sj-color-border);
+  border-radius: var(--sj-radius-control, 0.875rem);
+  color: var(--sj-color-text-muted);
+  background: color-mix(in srgb, var(--sj-color-surface) 72%, transparent);
+  backdrop-filter: blur(1rem);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    color var(--sj-motion-hover, 160ms) ease,
+    border-color var(--sj-motion-hover, 160ms) ease,
+    background-color var(--sj-motion-hover, 160ms) ease;
+}
+
+.sj-memory-explore:hover {
+  color: var(--sj-color-text);
+  border-color: color-mix(in srgb, var(--sj-color-focus) 42%, transparent);
+  background: color-mix(in srgb, var(--sj-color-surface) 88%, transparent);
+}
+
+.sj-memory-explore:active {
+  transform: translateY(1px);
+}
+
+.sj-memory-explore:focus-visible,
+.sj-icon-button:focus-visible,
+.sj-primary-button:focus-visible,
+.sj-secondary-button:focus-visible,
+.sj-memory-list button:focus-visible {
+  outline: 2px solid var(--sj-color-focus);
+  outline-offset: 3px;
+}
+
+.sj-memory-explore svg,
+.sj-primary-button svg,
+.sj-secondary-button svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.sj-memory-explore__count {
+  min-width: 1.4rem;
+  height: 1.4rem;
+  display: grid;
+  place-items: center;
+  padding-inline: 0.3rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sj-color-blossom) 14%, transparent);
+  color: var(--sj-color-blossom-light);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.sj-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: color-mix(in srgb, var(--sj-color-void) 66%, transparent);
+  backdrop-filter: blur(0.75rem);
+  animation: sj-overlay-in var(--sj-motion-dialog, 320ms)
+    cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sj-memory-navigator,
+.sj-memory-preview {
+  position: fixed;
+  z-index: 61;
+  color: var(--sj-color-text);
+  background: var(--sj-color-surface);
+  border: 1px solid var(--sj-color-border);
+  box-shadow: 0 2rem 5rem
+    color-mix(in srgb, var(--sj-color-void) 70%, transparent);
+  animation: sj-dialog-in var(--sj-motion-dialog, 320ms)
+    cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.sj-memory-navigator {
+  top: 50%;
+  left: 50%;
+  width: min(calc(100vw - 2.5rem), 32rem);
+  max-height: min(78dvh, 42rem);
+  display: flex;
+  flex-direction: column;
+  padding: var(--sj-space-5, 1.25rem);
+  border-radius: var(--sj-radius-surface, 1.5rem);
+  transform: translate(-50%, -50%);
+}
+
+.sj-dialog-heading,
+.sj-memory-preview__meta {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--sj-space-4, 1rem);
+}
+
+.sj-dialog-heading h2,
+.sj-memory-preview h2 {
+  margin: 0;
+  font-family: var(--sj-font-poetic);
+  font-size: 1.5rem;
+  line-height: 1.25;
+  font-weight: 450;
+  letter-spacing: -0.02em;
+}
+
+.sj-dialog-heading p {
+  margin: var(--sj-space-1, 0.25rem) 0 0;
+  color: var(--sj-color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.sj-icon-button {
+  width: 2.75rem;
+  height: 2.75rem;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--sj-radius-control, 0.875rem);
+  background: transparent;
+  color: var(--sj-color-text-muted);
+  cursor: pointer;
+  transition:
+    color var(--sj-motion-hover, 160ms) ease,
+    background-color var(--sj-motion-hover, 160ms) ease;
+}
+
+.sj-icon-button:hover {
+  color: var(--sj-color-text);
+  background: color-mix(in srgb, var(--sj-color-moon) 8%, transparent);
+}
+
+.sj-icon-button:active {
+  transform: translateY(1px);
+}
+
+.sj-icon-button svg {
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+.sj-memory-list {
+  list-style: none;
+  margin: var(--sj-space-5, 1.25rem) calc(var(--sj-space-2, 0.5rem) * -1) 0;
+  padding: 0 var(--sj-space-2, 0.5rem);
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+.sj-memory-list li + li {
+  border-top: 1px solid var(--sj-color-border);
+}
+
+.sj-memory-list button {
+  width: 100%;
+  min-height: 4.25rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: var(--sj-space-3, 0.75rem);
+  padding: var(--sj-space-3, 0.75rem) var(--sj-space-2, 0.5rem);
+  border: 0;
+  border-radius: var(--sj-radius-control, 0.875rem);
+  color: var(--sj-color-text);
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--sj-motion-hover, 160ms) ease;
+}
+
+.sj-memory-list button:hover,
+.sj-memory-list button[aria-current="true"] {
+  background: color-mix(in srgb, var(--sj-color-moon) 7%, transparent);
+}
+
+.sj-memory-list__marker {
+  width: 0.7rem;
+  height: 0.7rem;
+  border-radius: 50%;
+  background: var(--sj-color-leaf);
+  box-shadow: 0 0 0 0.22rem
+    color-mix(in srgb, var(--sj-color-leaf) 12%, transparent);
+}
+
+.sj-memory-list__marker:not([data-form="leaf"]) {
+  background: var(--sj-color-blossom);
+  box-shadow: 0 0 0 0.22rem
+    color-mix(in srgb, var(--sj-color-blossom) 12%, transparent);
+}
+
+.sj-memory-list__marker[data-form="luminous-blossom"] {
+  background: var(--sj-color-blossom-light);
+  box-shadow:
+    0 0 0 0.22rem
+      color-mix(in srgb, var(--sj-color-blossom) 14%, transparent),
+    0 0 0.75rem var(--sj-color-blossom);
+}
+
+.sj-memory-list__copy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.sj-memory-list__copy > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+}
+
+.sj-memory-list__copy time {
+  color: var(--sj-color-text-muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}
+
+.sj-memory-list button > svg {
+  width: 1rem;
+  height: 1rem;
+  color: var(--sj-color-text-muted);
+}
+
+.sj-memory-empty {
+  min-height: 14rem;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: var(--sj-space-3, 0.75rem);
+  color: var(--sj-color-text-muted);
+  text-align: center;
+}
+
+.sj-memory-empty svg {
+  width: 2rem;
+  height: 2rem;
+  color: var(--sj-color-blossom);
+}
+
+.sj-memory-empty p {
+  max-width: 17rem;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.sj-memory-preview {
+  top: 50%;
+  left: 50%;
+  width: min(calc(100vw - 2.5rem), 29rem);
+  padding: var(--sj-space-6, 1.5rem);
+  border-radius: var(--sj-radius-surface, 1.5rem);
+  transform: translate(-50%, -50%);
+}
+
+.sj-memory-preview__form {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sj-space-2, 0.5rem);
+  color: var(--sj-color-blossom-light);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.sj-memory-preview__form svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+.sj-memory-preview__date {
+  display: block;
+  margin-top: var(--sj-space-7, 1.75rem);
+  color: var(--sj-color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.sj-memory-preview h2 {
+  margin-top: var(--sj-space-2, 0.5rem);
+  font-size: 1.75rem;
+}
+
+.sj-memory-preview__insight {
+  margin: var(--sj-space-4, 1rem) 0 0;
+  color: var(--sj-color-text-muted);
+  font-family: var(--sj-font-poetic);
+  font-size: 1.0625rem;
+  line-height: 1.65;
+}
+
+.sj-memory-preview__actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sj-space-3, 0.75rem);
+  margin-top: var(--sj-space-7, 1.75rem);
+}
+
+.sj-primary-button,
+.sj-secondary-button {
+  min-height: 3rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sj-space-2, 0.5rem);
+  padding: 0 var(--sj-space-4, 1rem);
+  border-radius: var(--sj-radius-control, 0.875rem);
+  font: inherit;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.sj-primary-button {
+  border: 1px solid var(--sj-color-blossom-light);
+  color: var(--sj-color-void);
+  background: var(--sj-color-blossom-light);
+}
+
+.sj-secondary-button {
+  border: 1px solid var(--sj-color-border);
+  color: var(--sj-color-text);
+  background: transparent;
+}
+
+@keyframes sj-overlay-in {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes sj-dialog-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% + 0.75rem));
+  }
+}
+
+@media (max-width: 40rem) {
+  .sj-memory-navigator,
+  .sj-memory-preview {
+    top: auto;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    max-height: min(84dvh, 44rem);
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: var(--sj-radius-surface, 1.5rem)
+      var(--sj-radius-surface, 1.5rem) 0 0;
+    transform: none;
+    padding-bottom: calc(
+      var(--sj-space-6, 1.5rem) + env(safe-area-inset-bottom)
+    );
+    animation-name: sj-drawer-in;
+  }
+
+  .sj-memory-preview__actions {
+    grid-template-columns: 1fr;
+  }
+}
+
+@keyframes sj-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sj-dialog-overlay,
+  .sj-memory-navigator,
+  .sj-memory-preview {
+    animation-duration: 150ms;
+  }
+}
+

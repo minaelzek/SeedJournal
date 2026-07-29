@@ -1,0 +1,155 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+
+  /* Primitive palette */
+  --primitive-void: #070914;
+  --primitive-indigo: #10162b;
+  --primitive-wash: #1a2140;
+  --primitive-moon: #dde5f7;
+  --primitive-moon-muted: #aab6d0;
+  --primitive-trunk: #17131d;
+  --primitive-trunk-highlight: #3d3042;
+  --primitive-blossom: #f2b6cd;
+  --primitive-blossom-light: #ffe0eb;
+  --primitive-blossom-shadow: #c77f9e;
+  --primitive-leaf: #799f91;
+  --primitive-destructive: #f19aa5;
+
+  /* Semantic tokens */
+  --color-background: var(--primitive-void);
+  --color-background-elevated: var(--primitive-indigo);
+  --color-surface: rgb(15 18 34 / 94%);
+  --color-surface-raised: rgb(26 33 64 / 96%);
+  --color-text-primary: #f7f2f5;
+  --color-text-secondary: #bcc1d0;
+  --color-border: rgb(221 229 247 / 16%);
+  --color-border-strong: rgb(221 229 247 / 28%);
+  --color-focus: #ffd6e6;
+  --color-blossom: var(--primitive-blossom);
+  --color-blossom-light: var(--primitive-blossom-light);
+  --color-leaf: var(--primitive-leaf);
+  --color-destructive: var(--primitive-destructive);
+  --background: var(--color-background);
+  --foreground: var(--color-text-primary);
+
+  /* Typography */
+  --font-poetic: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  --font-ui: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+
+  /* Spatial and component tokens */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --radius-control: 0.875rem;
+  --radius-surface: 1.5rem;
+  --shadow-surface: 0 24px 80px rgb(0 0 0 / 30%);
+  --motion-press: 100ms;
+  --motion-interface: 180ms;
+  --motion-surface: 320ms;
+  --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Garden feature aliases */
+  --sj-color-void: var(--primitive-void);
+  --sj-color-indigo: var(--primitive-indigo);
+  --sj-color-wash: var(--primitive-wash);
+  --sj-color-moon: var(--primitive-moon);
+  --sj-color-moon-muted: var(--primitive-moon-muted);
+  --sj-color-trunk: var(--primitive-trunk);
+  --sj-color-trunk-highlight: var(--primitive-trunk-highlight);
+  --sj-color-blossom: var(--primitive-blossom);
+  --sj-color-blossom-light: var(--primitive-blossom-light);
+  --sj-color-blossom-shadow: var(--primitive-blossom-shadow);
+  --sj-color-leaf: var(--primitive-leaf);
+  --sj-color-text: var(--color-text-primary);
+  --sj-color-text-muted: var(--color-text-secondary);
+  --sj-color-surface: var(--color-surface);
+  --sj-color-border: var(--color-border);
+  --sj-color-focus: var(--color-focus);
+  --sj-font-poetic: var(--font-poetic);
+  --sj-font-ui: var(--font-ui);
+  --sj-page-gutter: 3rem;
+  --sj-page-gutter-mobile: 1.25rem;
+  --sj-space-1: var(--space-1);
+  --sj-space-2: var(--space-2);
+  --sj-space-3: var(--space-3);
+  --sj-space-4: var(--space-4);
+  --sj-space-5: var(--space-5);
+  --sj-space-6: var(--space-6);
+  --sj-space-8: var(--space-8);
+  --sj-radius-control: var(--radius-control);
+  --sj-radius-surface: var(--radius-surface);
+  --sj-motion-fast: var(--motion-interface);
+  --sj-motion-surface: var(--motion-surface);
+  --sj-ease-enter: var(--ease-enter);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-ui);
+  --font-serif: var(--font-poetic);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 20rem;
+  min-height: 100%;
+  background: var(--color-background);
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  min-height: 100svh;
+  margin: 0;
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  color: var(--primitive-void);
+  background: var(--color-blossom-light);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

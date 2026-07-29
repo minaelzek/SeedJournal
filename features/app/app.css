@@ -1,0 +1,269 @@
+.sj-route-surface {
+  position: relative;
+  z-index: 2;
+  min-height: 100svh;
+}
+
+.sj-vault-screen,
+.sj-status-screen {
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: max(1.25rem, env(safe-area-inset-top))
+    max(1.25rem, env(safe-area-inset-right))
+    max(1.25rem, env(safe-area-inset-bottom))
+    max(1.25rem, env(safe-area-inset-left));
+  background:
+    radial-gradient(circle at 50% 16%, rgb(221 229 247 / 10%), transparent 28rem),
+    linear-gradient(145deg, var(--primitive-indigo), var(--primitive-void) 62%);
+}
+
+.sj-vault-card {
+  width: min(100%, 31rem);
+  padding: clamp(1.5rem, 5vw, 3rem);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-surface);
+}
+
+.sj-vault-card__mark {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  margin-bottom: 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  color: var(--color-blossom-light);
+}
+
+.sj-vault-card__mark svg {
+  width: 1.35rem;
+  height: 1.35rem;
+}
+
+.sj-eyebrow {
+  margin: 0 0 0.75rem;
+  color: var(--color-text-secondary);
+  font: 500 0.8125rem/1.125rem var(--font-ui);
+  letter-spacing: 0.04em;
+}
+
+.sj-vault-card h1,
+.sj-settings h1,
+.sj-status-screen h1 {
+  margin: 0;
+  font: 400 clamp(2rem, 7vw, 2.75rem) / 1 var(--font-poetic);
+  text-wrap: balance;
+}
+
+.sj-vault-card > p:not(.sj-eyebrow),
+.sj-status-screen p {
+  margin: 1rem 0 2rem;
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.sj-vault-card form,
+.sj-vault-card label,
+.sj-settings__fields {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.sj-vault-card form {
+  gap: 1rem;
+}
+
+.sj-vault-card label {
+  gap: 0.5rem;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
+.sj-vault-card input,
+.sj-settings input {
+  min-height: 3.25rem;
+  width: 100%;
+  padding: 0 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  background: var(--color-surface-raised);
+  outline: none;
+  transition: border-color var(--motion-interface), box-shadow var(--motion-interface);
+}
+
+.sj-vault-card input:focus,
+.sj-settings input:focus {
+  border-color: var(--color-focus);
+  box-shadow: 0 0 0 3px rgb(255 214 230 / 12%);
+}
+
+.sj-vault-card button,
+.sj-status-screen button {
+  min-height: 3.5rem;
+  border: 0;
+  border-radius: var(--radius-control);
+  color: var(--primitive-void);
+  background: var(--color-blossom-light);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--motion-interface), transform var(--motion-press);
+}
+
+.sj-vault-card button:hover,
+.sj-status-screen button:hover {
+  opacity: 0.9;
+}
+
+.sj-vault-card button:active,
+.sj-status-screen button:active {
+  transform: translateY(1px);
+}
+
+.sj-vault-card button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.sj-vault-card small {
+  display: block;
+  margin-top: 1.25rem;
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+  line-height: 1.5;
+}
+
+.sj-form-error {
+  margin: 0;
+  color: var(--color-destructive);
+  font-size: 0.8125rem;
+}
+
+.sj-status-screen > div {
+  width: min(100%, 30rem);
+  text-align: center;
+}
+
+.sj-status-orb {
+  display: inline-block;
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 2rem;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, var(--color-blossom-light), var(--color-blossom) 30%, transparent 72%);
+}
+
+.sj-status-orb--busy {
+  animation: sj-breathe 1.8s var(--ease-enter) infinite alternate;
+}
+
+.sj-status-screen button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 1.25rem;
+}
+
+.sj-settings {
+  position: relative;
+  z-index: 3;
+  width: min(100%, 48rem);
+  min-height: 100svh;
+  margin-inline: auto;
+  padding: 8rem max(1.25rem, env(safe-area-inset-right))
+    max(4rem, env(safe-area-inset-bottom))
+    max(1.25rem, env(safe-area-inset-left));
+}
+
+.sj-settings > section {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-surface);
+  background: var(--color-surface);
+}
+
+.sj-settings h2 {
+  margin: 0;
+  font: 400 1.5rem/1.25 var(--font-poetic);
+}
+
+.sj-settings section p {
+  color: var(--color-text-secondary);
+  line-height: 1.6;
+}
+
+.sj-settings__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.sj-settings__button,
+.sj-settings__signout {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-control);
+  color: var(--color-text-primary);
+  background: transparent;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background var(--motion-interface), border-color var(--motion-interface);
+}
+
+.sj-settings__button:hover,
+.sj-settings__signout:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-raised);
+}
+
+.sj-settings__button svg,
+.sj-settings__signout svg {
+  width: 1.1rem;
+  height: 1.1rem;
+}
+
+.sj-settings__button:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.sj-settings__danger {
+  border-color: rgb(241 154 165 / 28%) !important;
+}
+
+.sj-settings__button--danger {
+  margin-top: 0.75rem;
+  color: var(--color-destructive);
+}
+
+.sj-settings__signout {
+  margin-top: 2rem;
+}
+
+@keyframes sj-breathe {
+  from {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+@media (max-width: 47.99rem) {
+  .sj-route-surface {
+    background: var(--color-surface);
+  }
+}
