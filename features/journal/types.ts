@@ -1,17 +1,10 @@
 import type {
+  JournalRitualStage,
   JournalEntryPayloadV1,
   PromptCategory,
 } from "@/lib/contracts";
 
-export type RitualStage =
-  | "new"
-  | "writing"
-  | "reflection-offered"
-  | "follow-up-answered"
-  | "follow-up-skipped"
-  | "seed-insight-added"
-  | "seed-insight-skipped"
-  | "nurtured";
+export type RitualStage = JournalRitualStage;
 
 export type SaveState = "idle" | "saving" | "saved" | "offline" | "error";
 
@@ -43,4 +36,3 @@ export interface DecryptedJournalEntry {
   completedAt?: number;
   localDay?: string;
 }
-

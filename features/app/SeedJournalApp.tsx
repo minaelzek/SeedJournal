@@ -19,7 +19,11 @@ import {
 import { ArchiveView, EntryReader } from "@/features/archive";
 import type { GardenMemoryRecord } from "@/features/garden";
 import { GrowthReveal, stageForGrowthUnits } from "@/features/growth";
-import { JournalRitual, type DecryptedJournalEntry } from "@/features/journal";
+import {
+  JournalRitual,
+  type DecryptedJournalEntry,
+  type JournalRitualDraft,
+} from "@/features/journal";
 import { AppFrame, SeedJournalHeader, TreeFirstHome } from "@/features/shell";
 import type {
   EncryptedEntryEnvelope,
@@ -96,6 +100,7 @@ export function SeedJournalApp({
   const [entries, setEntries] = useState<DecryptedJournalEntry[]>([]);
   const [growthEvents, setGrowthEvents] = useState<TreeGrowthEvent[]>([]);
   const growthEventsRef = useRef<TreeGrowthEvent[]>([]);
+  const entryMutationQueuesRef = useRef(new Map<string, Promise<unknown>>());
   const [loadingMessage, setLoadingMessage] = useState("Opening your garden…");
   const [error, setError] = useState<string>();
   const [activeEntryId, setActiveEntryId] = useState(() => crypto.randomUUID());
@@ -181,6 +186,26 @@ export function SeedJournalApp({
       });
     },
     [bootstrap],
+  );
+
+  const runEntryMutation = useCallback(
+    <T,>(entryId: string, task: () => Promise<T>): Promise<T> => {
+      const previous =
+        entryMutationQueuesRef.current.get(entryId) ?? Promise.resolve();
+      const next = previous.catch(() => undefined).then(task);
+      const tail = next.then(
+        () => undefined,
+        () => undefined,
+      );
+      const settled = tail.finally(() => {
+        if (entryMutationQueuesRef.current.get(entryId) === settled) {
+          entryMutationQueuesRef.current.delete(entryId);
+        }
+      });
+      entryMutationQueuesRef.current.set(entryId, settled);
+      return next;
+    },
+    [],
   );
 
   const appendUnseenGrowthEvents = useCallback(
@@ -302,13 +327,18 @@ export function SeedJournalApp({
         restoredEnvelopes.map((envelope) => [envelope.id, envelope]),
       );
       setEnvelopes(restoredEnvelopes);
-      setEntries(
-        decrypted.sort(
-          (left, right) =>
-            (right.completedAt ?? right.updatedAt) -
-            (left.completedAt ?? left.updatedAt),
-        ),
+      const sortedEntries = decrypted.sort(
+        (left, right) =>
+          (right.completedAt ?? right.updatedAt) -
+          (left.completedAt ?? left.updatedAt),
       );
+      setEntries(sortedEntries);
+      if (window.location.pathname === "/journal/new") {
+        const resumableDraft = sortedEntries.find(
+          (entry) => !entry.completedAt && entry.payload.body.trim().length > 0,
+        );
+        if (resumableDraft) setActiveEntryId(resumableDraft.id);
+      }
       growthEventsRef.current = events;
       setGrowthEvents(events);
       setLoadingMessage("");
@@ -336,7 +366,7 @@ export function SeedJournalApp({
     await loadJournal(key);
   };
 
-  const saveDraft = useCallback(
+  const saveDraftNow = useCallback(
     async (entryId: string, payload: JournalEntryPayloadV1) => {
       if (!bootstrap || !vaultKey) return;
       const existing = envelopeRef.current.get(entryId);
@@ -396,94 +426,144 @@ export function SeedJournalApp({
     [bootstrap, mutate, vaultKey],
   );
 
+  const saveDraft = useCallback(
+    (entryId: string, payload: JournalEntryPayloadV1) =>
+      runEntryMutation(entryId, () => saveDraftNow(entryId, payload)),
+    [runEntryMutation, saveDraftNow],
+  );
+
   const completeEntry = useCallback(
-    async (entryId: string, payload: JournalEntryPayloadV1, localDay: string) => {
-      if (!bootstrap || !vaultKey || !payload.growth) return;
-      let existing = envelopeRef.current.get(entryId);
-      if (!existing) {
-        await saveDraft(entryId, payload);
-        existing = envelopeRef.current.get(entryId);
-      }
-      if (!existing) throw new Error("The draft could not be prepared.");
-      const completedAt = Date.now();
-      const envelope = await encryptEntryPayload(
-        vaultKey,
-        bootstrap.account.id,
-        payload,
-        {
-          id: entryId,
-          state: "complete",
-          revision: existing.revision + 1,
-          clientCreatedAt: existing.clientCreatedAt,
-          clientUpdatedAt: completedAt,
-          completedAt,
-          localDay,
-        },
-      );
-      const completion = {
-        id: payload.growth.completionId,
-        memoryForm: payload.growth.memoryForm,
-        growthUnits: payload.growth.growthUnits,
-        seed: payload.growth.seed,
-      };
-      let response: {
-        entry: EncryptedEntryEnvelope;
-        events: TreeGrowthEvent[];
-      };
-      try {
-        response = await mutate(
-          `/api/entries/${entryId}/complete`,
-          "POST",
-          {
-            expectedRevision: existing.revision,
-            envelope,
-            completion,
-          },
-        );
-      } catch (caught) {
-        if (!isNetworkFailure(caught)) throw caught;
-        await putEncryptedDraft(bootstrap.account.id, envelope);
-        await enqueueEncryptedOperation({
-          operationId: `complete:${bootstrap.account.id}:${entryId}:${completion.id}`,
-          accountId: bootstrap.account.id,
-          createdAt: completedAt,
-          kind: "complete",
-          expectedRevision: existing.revision,
-          envelope,
-          completion,
-        });
-        envelopeRef.current.set(entryId, envelope);
-        setEnvelopes(Array.from(envelopeRef.current.values()));
-        throw caught;
-      }
-      await removeEncryptedDraft(bootstrap.account.id, entryId);
-      envelopeRef.current.set(entryId, response.entry);
-      setEnvelopes(Array.from(envelopeRef.current.values()));
-      setEntries((current) => [
-        {
-          id: entryId,
+    (entryId: string, payload: JournalEntryPayloadV1, localDay: string) =>
+      runEntryMutation(entryId, async () => {
+        if (!bootstrap || !vaultKey || !payload.growth) return;
+        let existing = envelopeRef.current.get(entryId);
+        if (!existing) {
+          await saveDraftNow(entryId, payload);
+          existing = envelopeRef.current.get(entryId);
+        }
+        if (!existing) throw new Error("The draft could not be prepared.");
+
+        const completedAt = Date.now();
+        const completion = {
+          id: payload.growth.completionId,
+          memoryForm: payload.growth.memoryForm,
+          growthUnits: payload.growth.growthUnits,
+          seed: payload.growth.seed,
+        };
+        let completionBase = existing;
+        let completionEnvelope = await createCompletionEnvelope(
+          vaultKey,
+          bootstrap.account.id,
           payload,
-          createdAt: existing.clientCreatedAt,
-          updatedAt: completedAt,
+          completionBase,
           completedAt,
           localDay,
-        },
-        ...current.filter((entry) => entry.id !== entryId),
-      ]);
-      const unseenGrowth = appendUnseenGrowthEvents(response.events);
-      enqueueGrowthReveal(unseenGrowth, entryId);
-      setActiveEntryId(crypto.randomUUID());
-      navigate({ name: "home" });
-    },
+        );
+        let response:
+          | {
+              entry: EncryptedEntryEnvelope;
+              events: TreeGrowthEvent[];
+            }
+          | undefined;
+
+        for (let attempt = 0; attempt < 2 && !response; attempt += 1) {
+          try {
+            response = await mutate(
+              `/api/entries/${entryId}/complete`,
+              "POST",
+              {
+                expectedRevision: completionBase.revision,
+                envelope: completionEnvelope,
+                completion,
+              },
+            );
+          } catch (caught) {
+            if (attempt === 0 && isRevisionConflict(caught)) {
+              const latest = await fetchJson<{
+                entry: EncryptedEntryEnvelope;
+              }>(`/api/entries/${entryId}`);
+              if (latest.entry.state === "draft") {
+                completionBase = latest.entry;
+                completionEnvelope = await createCompletionEnvelope(
+                  vaultKey,
+                  bootstrap.account.id,
+                  payload,
+                  completionBase,
+                  completedAt,
+                  localDay,
+                );
+                envelopeRef.current.set(entryId, completionBase);
+              }
+              continue;
+            }
+
+            if (isNetworkFailure(caught)) {
+              await putEncryptedDraft(
+                bootstrap.account.id,
+                completionEnvelope,
+              );
+              await enqueueEncryptedOperation({
+                operationId: `complete:${bootstrap.account.id}:${entryId}:${completion.id}`,
+                accountId: bootstrap.account.id,
+                createdAt: completedAt,
+                kind: "complete",
+                expectedRevision: completionBase.revision,
+                envelope: completionEnvelope,
+                completion,
+              });
+              envelopeRef.current.set(entryId, completionEnvelope);
+              setEnvelopes(Array.from(envelopeRef.current.values()));
+            }
+            throw caught;
+          }
+        }
+
+        if (!response) {
+          throw new Error("The completed reflection could not be confirmed.");
+        }
+        await removeEncryptedDraft(bootstrap.account.id, entryId);
+        envelopeRef.current.set(entryId, response.entry);
+        setEnvelopes(Array.from(envelopeRef.current.values()));
+        setEntries((current) => [
+          {
+            id: entryId,
+            payload,
+            createdAt: completionBase.clientCreatedAt,
+            updatedAt: completedAt,
+            completedAt,
+            localDay,
+          },
+          ...current.filter((entry) => entry.id !== entryId),
+        ]);
+        const unseenGrowth = appendUnseenGrowthEvents(response.events);
+        enqueueGrowthReveal(unseenGrowth, entryId);
+        setActiveEntryId(crypto.randomUUID());
+        navigate({ name: "home" });
+      }),
     [
       appendUnseenGrowthEvents,
       bootstrap,
       enqueueGrowthReveal,
       mutate,
       navigate,
-      saveDraft,
+      runEntryMutation,
+      saveDraftNow,
       vaultKey,
     ],
+  );
+
+  const autosaveActiveEntry = useCallback(
+    (draft: JournalRitualDraft) =>
+      saveDraft(activeEntryId, draft.entry),
+    [activeEntryId, saveDraft],
+  );
+
+  const completeActiveEntry = useCallback(
+    (result: {
+      entry: JournalEntryPayloadV1;
+      localDay: string;
+    }) => completeEntry(activeEntryId, result.entry, result.localDay),
+    [activeEntryId, completeEntry],
   );
 
   const flushEncryptedOutbox = useCallback(async () => {
@@ -764,11 +844,21 @@ export function SeedJournalApp({
 
   let routeContent: ReactNode;
   if (route.name === "new") {
+    const restoredEntry = entries.find(
+      (entry) => entry.id === activeEntryId && !entry.completedAt,
+    );
+    const restoredDraft: JournalRitualDraft | undefined = restoredEntry
+      ? {
+          stage: inferRitualStage(restoredEntry.payload),
+          entry: restoredEntry.payload,
+        }
+      : undefined;
     routeContent = (
       <main className="sj-route-surface" id="main-content">
         <JournalRitual
           key={activeEntryId}
           entryId={activeEntryId}
+          restoredDraft={restoredDraft}
           localDay={localDay()}
           identitySeed={bootstrap.account.treeSeed}
           kind={route.parentEntryId ? "revisit" : "entry"}
@@ -777,10 +867,8 @@ export function SeedJournalApp({
           previousFollowUpIds={entries
             .map((entry) => entry.payload.followUp?.id)
             .filter((id): id is string => Boolean(id))}
-          onAutosave={({ entry }) => saveDraft(activeEntryId, entry)}
-          onComplete={({ entry, localDay: day }) =>
-            completeEntry(activeEntryId, entry, day)
-          }
+          onAutosave={autosaveActiveEntry}
+          onComplete={completeActiveEntry}
           onExit={() => navigate({ name: "home" })}
         />
       </main>
@@ -1192,6 +1280,36 @@ function StatusScreen({
   );
 }
 
+class ApiClientError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = "ApiClientError";
+  }
+}
+
+async function createCompletionEnvelope(
+  vaultKey: CryptoKey,
+  accountId: string,
+  payload: JournalEntryPayloadV1,
+  base: EncryptedEntryEnvelope,
+  completedAt: number,
+  localDay: string,
+): Promise<EncryptedEntryEnvelope> {
+  return encryptEntryPayload(vaultKey, accountId, payload, {
+    id: base.id,
+    state: "complete",
+    revision: base.revision + 1,
+    clientCreatedAt: base.clientCreatedAt,
+    clientUpdatedAt: completedAt,
+    completedAt,
+    localDay,
+  });
+}
+
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
     credentials: "same-origin",
@@ -1200,15 +1318,28 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   });
   const body = (await response.json()) as
     | T
-    | { error?: { message?: string } };
+    | { error?: { code?: string; message?: string } };
   if (!response.ok) {
-    throw new Error(
+    const apiError =
       "error" in (body as object)
-        ? (body as { error?: { message?: string } }).error?.message
-        : "The request could not be completed.",
+        ? (body as { error?: { code?: string; message?: string } }).error
+        : undefined;
+    throw new ApiClientError(
+      response.status,
+      apiError?.code ?? "request_failed",
+      apiError?.message ?? "The request could not be completed.",
     );
   }
   return body as T;
+}
+
+function isRevisionConflict(caught: unknown): boolean {
+  return (
+    caught instanceof ApiClientError &&
+    caught.status === 409 &&
+    (caught.code === "revision_conflict" ||
+      caught.code === "completion_conflict")
+  );
 }
 
 function isNetworkFailure(caught: unknown): boolean {
@@ -1216,6 +1347,19 @@ function isNetworkFailure(caught: unknown): boolean {
     (typeof navigator !== "undefined" && !navigator.onLine) ||
     caught instanceof TypeError
   );
+}
+
+function inferRitualStage(
+  payload: JournalEntryPayloadV1,
+): JournalRitualDraft["stage"] {
+  const persisted = payload.ritual.stage;
+  if (persisted && persisted !== "nurtured") return persisted;
+  if (payload.followUp?.skipped || payload.ritual.conciseBodyOverride) {
+    return "follow-up-skipped";
+  }
+  if (payload.followUp?.response.trim()) return "follow-up-answered";
+  if (payload.followUp) return "reflection-offered";
+  return payload.body.trim() ? "writing" : "new";
 }
 
 function localDay() {

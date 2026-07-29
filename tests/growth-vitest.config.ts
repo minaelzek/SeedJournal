@@ -9,6 +9,9 @@ export default defineConfig({
   },
   test: {
     environment: "jsdom",
-    include: ["tests/growth-experience.test.tsx"],
+    include: [
+      "tests/growth-experience.test.tsx",
+      "tests/journal-recovery.test.tsx",
+    ],
   },
 });

@@ -108,6 +108,16 @@ export function JournalRitual({
     () => measureReflectionEligibility(state.entry.body),
     [state.entry.body],
   );
+  const persistedDraft = useMemo<JournalRitualDraft>(
+    () => ({
+      stage: state.stage,
+      entry: {
+        ...state.entry,
+        ritual: { ...state.entry.ritual, stage: state.stage },
+      },
+    }),
+    [state.entry, state.stage],
+  );
 
   useEffect(() => {
     if (!onAutosave || state.stage === "new" || state.stage === "nurtured") {
@@ -117,7 +127,7 @@ export function JournalRitual({
     const timeout = window.setTimeout(async () => {
       setSaveState("saving");
       try {
-        await onAutosave({ stage: state.stage, entry: state.entry });
+        await onAutosave(persistedDraft);
         if (saveVersion.current === version) setSaveState("saved");
       } catch {
         if (saveVersion.current === version) {
@@ -126,7 +136,7 @@ export function JournalRitual({
       }
     }, 2_000);
     return () => window.clearTimeout(timeout);
-  }, [onAutosave, state.entry, state.stage]);
+  }, [onAutosave, persistedDraft, state.stage]);
 
   const saveImmediately = async () => {
     if (!onAutosave || state.stage === "new" || state.stage === "nurtured") {
@@ -135,7 +145,7 @@ export function JournalRitual({
     const version = ++saveVersion.current;
     setSaveState("saving");
     try {
-      await onAutosave({ stage: state.stage, entry: state.entry });
+      await onAutosave(persistedDraft);
       if (saveVersion.current === version) setSaveState("saved");
     } catch {
       if (saveVersion.current === version) {
@@ -155,7 +165,10 @@ export function JournalRitual({
     setIsCompleting(true);
     try {
       await onComplete({
-        entry: completed.entry,
+        entry: {
+          ...completed.entry,
+          ritual: { ...completed.entry.ritual, stage: "nurtured" },
+        },
         localDay,
         stage: "nurtured",
       });

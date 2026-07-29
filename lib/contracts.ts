@@ -46,6 +46,16 @@ export interface ReflectionSnapshot {
   selectedTarget: ReflectionSignal | "deepen" | "language-neutral";
 }
 
+export type JournalRitualStage =
+  | "new"
+  | "writing"
+  | "reflection-offered"
+  | "follow-up-answered"
+  | "follow-up-skipped"
+  | "seed-insight-added"
+  | "seed-insight-skipped"
+  | "nurtured";
+
 export interface JournalEntryPayloadV1 {
   version: 1;
   kind: "entry" | "revisit";
@@ -71,6 +81,7 @@ export interface JournalEntryPayloadV1 {
   ritual: {
     conciseBodyOverride: boolean;
     conciseFollowUpOverride: boolean;
+    stage?: JournalRitualStage;
   };
   reflection?: ReflectionSnapshot;
   growth?: {
