@@ -4,17 +4,20 @@
   color-scheme: dark;
 
   /* Primitive palette */
-  --primitive-void: #070914;
-  --primitive-indigo: #10162b;
-  --primitive-wash: #1a2140;
-  --primitive-moon: #dde5f7;
-  --primitive-moon-muted: #aab6d0;
-  --primitive-trunk: #17131d;
-  --primitive-trunk-highlight: #3d3042;
-  --primitive-blossom: #f2b6cd;
-  --primitive-blossom-light: #ffe0eb;
-  --primitive-blossom-shadow: #c77f9e;
-  --primitive-leaf: #799f91;
+  --primitive-void: #080a0f;
+  --primitive-indigo: #11151c;
+  --primitive-wash: #1b2230;
+  --primitive-moon: #d9e1e8;
+  --primitive-moon-muted: #9da8b4;
+  --primitive-trunk: #251719;
+  --primitive-trunk-highlight: #6a3e3e;
+  --primitive-bark-lenticel: #a67870;
+  --primitive-soil: #181417;
+  --primitive-blossom: #f1d9dc;
+  --primitive-blossom-light: #fff3f1;
+  --primitive-blossom-shadow: #c68e98;
+  --primitive-leaf: #718378;
+  --primitive-leaf-bronze: #8e7062;
   --primitive-destructive: #f19aa5;
 
   /* Semantic tokens */
@@ -66,10 +69,13 @@
   --sj-color-moon-muted: var(--primitive-moon-muted);
   --sj-color-trunk: var(--primitive-trunk);
   --sj-color-trunk-highlight: var(--primitive-trunk-highlight);
+  --sj-color-bark-lenticel: var(--primitive-bark-lenticel);
+  --sj-color-soil: var(--primitive-soil);
   --sj-color-blossom: var(--primitive-blossom);
   --sj-color-blossom-light: var(--primitive-blossom-light);
   --sj-color-blossom-shadow: var(--primitive-blossom-shadow);
   --sj-color-leaf: var(--primitive-leaf);
+  --sj-color-leaf-bronze: var(--primitive-leaf-bronze);
   --sj-color-text: var(--color-text-primary);
   --sj-color-text-muted: var(--color-text-secondary);
   --sj-color-surface: var(--color-surface);
@@ -148,8 +154,8 @@ a {
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    animation-duration: 0.01ms !important;
+    animation-duration: 150ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    transition-duration: 150ms !important;
   }
 }

@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import {
   ArrowLeft,
   DownloadSimple,
@@ -11,11 +18,13 @@ import {
 } from "@phosphor-icons/react";
 import { ArchiveView, EntryReader } from "@/features/archive";
 import type { GardenMemoryRecord } from "@/features/garden";
+import { GrowthReveal, stageForGrowthUnits } from "@/features/growth";
 import { JournalRitual, type DecryptedJournalEntry } from "@/features/journal";
 import { AppFrame, SeedJournalHeader, TreeFirstHome } from "@/features/shell";
 import type {
   EncryptedEntryEnvelope,
   JournalEntryPayloadV1,
+  TreeGrowthDelta,
   TreeGrowthEvent,
   TreeSnapshot,
 } from "@/lib/contracts";
@@ -31,6 +40,13 @@ import {
   buildEncryptedArchive,
   buildReadableMarkdown,
   clearEncryptedLocalData,
+  enqueueEncryptedOperation,
+  listEncryptedDrafts,
+  listEncryptedOperations,
+  putEncryptedDraft,
+  removeEncryptedDraft,
+  removeEncryptedOperation,
+  type EncryptedOutboxOperation,
 } from "@/lib/storage";
 import "./app.css";
 
@@ -42,7 +58,11 @@ type Route =
   | { name: "settings" };
 
 interface BootstrapResponse {
-  account: { id: string; treeSeed: string };
+  account: {
+    id: string;
+    treeSeed: string;
+    treeAlgorithmVersion: 1 | 2;
+  };
   vault: { configured: boolean };
   journal: { entryCount: number };
   csrfToken: string;
@@ -58,6 +78,11 @@ interface SeedJournalAppProps {
   displayName: string;
 }
 
+interface PendingGrowthReveal {
+  delta: TreeGrowthDelta;
+  entryId: string;
+}
+
 export function SeedJournalApp({
   initialPath,
   displayName,
@@ -70,9 +95,17 @@ export function SeedJournalApp({
   const envelopeRef = useRef(new Map<string, EncryptedEntryEnvelope>());
   const [entries, setEntries] = useState<DecryptedJournalEntry[]>([]);
   const [growthEvents, setGrowthEvents] = useState<TreeGrowthEvent[]>([]);
+  const growthEventsRef = useRef<TreeGrowthEvent[]>([]);
   const [loadingMessage, setLoadingMessage] = useState("Opening your garden…");
   const [error, setError] = useState<string>();
   const [activeEntryId, setActiveEntryId] = useState(() => crypto.randomUUID());
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [growthRevealQueue, setGrowthRevealQueue] = useState<
+    PendingGrowthReveal[]
+  >([]);
+  const [visualTestUnits] = useState<number | null>(readVisualTestUnits);
+  const [visualPreviewEpoch] = useState(() => Date.now());
+  const reducedMotion = useReducedMotionPreference();
 
   const navigate = useCallback((next: Route) => {
     const path = pathForRoute(next);
@@ -85,6 +118,13 @@ export function SeedJournalApp({
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    const target = document.getElementById("main-content");
+    if (!target) return;
+    target.setAttribute("tabindex", "-1");
+    target.focus({ preventScroll: true });
+  }, [growthRevealQueue.length, route]);
 
   useEffect(() => {
     void (async () => {
@@ -107,6 +147,7 @@ export function SeedJournalApp({
             account: {
               id: "00000000-0000-4000-8000-000000000001",
               treeSeed: "seed-journal-preview-tree",
+              treeAlgorithmVersion: 2,
             },
             vault: { configured: true },
             journal: { entryCount: 1 },
@@ -116,7 +157,9 @@ export function SeedJournalApp({
           setVault({ ...created.metadata, revision: 1, updatedAt: now });
           setVaultKey(created.vaultKey);
           setEntries([previewEntry(now)]);
-          setGrowthEvents(previewGrowth(now));
+          const previewEvents = previewGrowth(now);
+          growthEventsRef.current = previewEvents;
+          setGrowthEvents(previewEvents);
           setLoadingMessage("");
         } else {
           setError("Your private garden could not be opened. Please try again.");
@@ -140,26 +183,98 @@ export function SeedJournalApp({
     [bootstrap],
   );
 
+  const appendUnseenGrowthEvents = useCallback(
+    (incoming: readonly TreeGrowthEvent[]) => {
+      const current = growthEventsRef.current;
+      const knownIds = new Set(current.map((event) => event.id));
+      const knownSequences = new Set(current.map((event) => event.sequence));
+      const unseen = incoming
+        .filter(
+          (event) =>
+            !knownIds.has(event.id) && !knownSequences.has(event.sequence),
+        )
+        .sort((left, right) => left.sequence - right.sequence);
+      if (unseen.length === 0) return unseen;
+      const merged = [...current, ...unseen].sort(
+        (left, right) => left.sequence - right.sequence,
+      );
+      growthEventsRef.current = merged;
+      setGrowthEvents(merged);
+      return unseen;
+    },
+    [],
+  );
+
+  const enqueueGrowthReveal = useCallback(
+    (events: readonly TreeGrowthEvent[], entryId: string) => {
+      if (events.length === 0) return;
+      const firstSequence = events[0].sequence;
+      const lastSequence = events.at(-1)?.sequence ?? firstSequence;
+      setGrowthRevealQueue((current) => [
+        ...current,
+        {
+          entryId,
+          delta: {
+            previousSequence: firstSequence - 1,
+            nextSequence: lastSequence,
+            events: [...events],
+          },
+        },
+      ]);
+      setSelectedEntryId((current) => current ?? entryId);
+    },
+    [],
+  );
+
   const loadJournal = useCallback(
     async (key: CryptoKey) => {
       if (!bootstrap) return;
       setLoadingMessage("Restoring your memories…");
       const allEnvelopes: EncryptedEntryEnvelope[] = [];
-      let cursor: string | null = null;
-      do {
-        const query = cursor
-          ? `/api/entries?limit=100&cursor=${encodeURIComponent(cursor)}`
-          : "/api/entries?limit=100";
-        const page: {
-          entries: EncryptedEntryEnvelope[];
-          nextCursor: string | null;
-        } = await fetchJson(query);
-        allEnvelopes.push(...page.entries);
-        cursor = page.nextCursor;
-      } while (cursor);
+      const events: TreeGrowthEvent[] = [];
+      try {
+        let cursor: string | null = null;
+        do {
+          const query = cursor
+            ? `/api/entries?limit=100&cursor=${encodeURIComponent(cursor)}`
+            : "/api/entries?limit=100";
+          const page: {
+            entries: EncryptedEntryEnvelope[];
+            nextCursor: string | null;
+          } = await fetchJson(query);
+          allEnvelopes.push(...page.entries);
+          cursor = page.nextCursor;
+        } while (cursor);
 
+        let after = 0;
+        let hasMore = true;
+        while (hasMore) {
+          const page: {
+            nextSequence: number;
+            events: TreeGrowthEvent[];
+            hasMore: boolean;
+          } = await fetchJson(`/api/growth?limit=100&after=${after}`);
+          events.push(...page.events);
+          after = page.nextSequence;
+          hasMore = page.hasMore;
+        }
+      } catch (caught) {
+        if (!isNetworkFailure(caught)) throw caught;
+      }
+
+      const localDrafts = await listEncryptedDrafts(bootstrap.account.id);
+      const mergedEnvelopes = new Map(
+        allEnvelopes.map((envelope) => [envelope.id, envelope]),
+      );
+      localDrafts.forEach((envelope) => {
+        const saved = mergedEnvelopes.get(envelope.id);
+        if (!saved || envelope.revision >= saved.revision) {
+          mergedEnvelopes.set(envelope.id, envelope);
+        }
+      });
+      const restoredEnvelopes = Array.from(mergedEnvelopes.values());
       const decrypted: DecryptedJournalEntry[] = [];
-      for (const envelope of allEnvelopes) {
+      for (const envelope of restoredEnvelopes) {
         try {
           const payload = await decryptEntryPayload(
             key,
@@ -183,24 +298,10 @@ export function SeedJournalApp({
         }
       }
 
-      const events: TreeGrowthEvent[] = [];
-      let after = 0;
-      let hasMore = true;
-      while (hasMore) {
-        const page: {
-          nextSequence: number;
-          events: TreeGrowthEvent[];
-          hasMore: boolean;
-        } = await fetchJson(`/api/growth?limit=100&after=${after}`);
-        events.push(...page.events);
-        after = page.nextSequence;
-        hasMore = page.hasMore;
-      }
-
       envelopeRef.current = new Map(
-        allEnvelopes.map((envelope) => [envelope.id, envelope]),
+        restoredEnvelopes.map((envelope) => [envelope.id, envelope]),
       );
-      setEnvelopes(allEnvelopes);
+      setEnvelopes(restoredEnvelopes);
       setEntries(
         decrypted.sort(
           (left, right) =>
@@ -208,6 +309,7 @@ export function SeedJournalApp({
             (left.completedAt ?? left.updatedAt),
         ),
       );
+      growthEventsRef.current = events;
       setGrowthEvents(events);
       setLoadingMessage("");
     },
@@ -251,18 +353,44 @@ export function SeedJournalApp({
           clientUpdatedAt: now,
         },
       );
-      const response = existing
-        ? await mutate<{ entry: EncryptedEntryEnvelope }>(
-            `/api/entries/${entryId}`,
-            "PUT",
-            { expectedRevision: existing.revision, envelope },
-          )
-        : await mutate<{ entry: EncryptedEntryEnvelope }>(
-            "/api/entries",
-            "POST",
-            envelope,
-          );
-      envelopeRef.current.set(entryId, response.entry);
+      await putEncryptedDraft(bootstrap.account.id, envelope);
+      let storedEnvelope: EncryptedEntryEnvelope;
+      try {
+        const response = existing
+          ? await mutate<{ entry: EncryptedEntryEnvelope }>(
+              `/api/entries/${entryId}`,
+              "PUT",
+              { expectedRevision: existing.revision, envelope },
+            )
+          : await mutate<{ entry: EncryptedEntryEnvelope }>(
+              "/api/entries",
+              "POST",
+              envelope,
+            );
+        storedEnvelope = response.entry;
+        await removeEncryptedDraft(bootstrap.account.id, entryId);
+      } catch (caught) {
+        if (!isNetworkFailure(caught)) throw caught;
+        const operation: EncryptedOutboxOperation = existing
+          ? {
+              operationId: `draft:${bootstrap.account.id}:${entryId}:${envelope.revision}`,
+              accountId: bootstrap.account.id,
+              createdAt: now,
+              kind: "update",
+              expectedRevision: existing.revision,
+              envelope,
+            }
+          : {
+              operationId: `draft:${bootstrap.account.id}:${entryId}:${envelope.revision}`,
+              accountId: bootstrap.account.id,
+              createdAt: now,
+              kind: "create",
+              envelope,
+            };
+        await enqueueEncryptedOperation(operation);
+        storedEnvelope = envelope;
+      }
+      envelopeRef.current.set(entryId, storedEnvelope);
       setEnvelopes(Array.from(envelopeRef.current.values()));
     },
     [bootstrap, mutate, vaultKey],
@@ -292,19 +420,43 @@ export function SeedJournalApp({
           localDay,
         },
       );
-      const response = await mutate<{
+      const completion = {
+        id: payload.growth.completionId,
+        memoryForm: payload.growth.memoryForm,
+        growthUnits: payload.growth.growthUnits,
+        seed: payload.growth.seed,
+      };
+      let response: {
         entry: EncryptedEntryEnvelope;
         events: TreeGrowthEvent[];
-      }>(`/api/entries/${entryId}/complete`, "POST", {
-        expectedRevision: existing.revision,
-        envelope,
-        completion: {
-          id: payload.growth.completionId,
-          memoryForm: payload.growth.memoryForm,
-          growthUnits: payload.growth.growthUnits,
-          seed: payload.growth.seed,
-        },
-      });
+      };
+      try {
+        response = await mutate(
+          `/api/entries/${entryId}/complete`,
+          "POST",
+          {
+            expectedRevision: existing.revision,
+            envelope,
+            completion,
+          },
+        );
+      } catch (caught) {
+        if (!isNetworkFailure(caught)) throw caught;
+        await putEncryptedDraft(bootstrap.account.id, envelope);
+        await enqueueEncryptedOperation({
+          operationId: `complete:${bootstrap.account.id}:${entryId}:${completion.id}`,
+          accountId: bootstrap.account.id,
+          createdAt: completedAt,
+          kind: "complete",
+          expectedRevision: existing.revision,
+          envelope,
+          completion,
+        });
+        envelopeRef.current.set(entryId, envelope);
+        setEnvelopes(Array.from(envelopeRef.current.values()));
+        throw caught;
+      }
+      await removeEncryptedDraft(bootstrap.account.id, entryId);
       envelopeRef.current.set(entryId, response.entry);
       setEnvelopes(Array.from(envelopeRef.current.values()));
       setEntries((current) => [
@@ -318,12 +470,161 @@ export function SeedJournalApp({
         },
         ...current.filter((entry) => entry.id !== entryId),
       ]);
-      setGrowthEvents((current) => [...current, ...response.events]);
+      const unseenGrowth = appendUnseenGrowthEvents(response.events);
+      enqueueGrowthReveal(unseenGrowth, entryId);
       setActiveEntryId(crypto.randomUUID());
       navigate({ name: "home" });
     },
-    [bootstrap, mutate, navigate, saveDraft, vaultKey],
+    [
+      appendUnseenGrowthEvents,
+      bootstrap,
+      enqueueGrowthReveal,
+      mutate,
+      navigate,
+      saveDraft,
+      vaultKey,
+    ],
   );
+
+  const flushEncryptedOutbox = useCallback(async () => {
+    if (!bootstrap || !vaultKey || !navigator.onLine) return;
+    const operations = await listEncryptedOperations(bootstrap.account.id);
+
+    for (const operation of operations) {
+      try {
+        if (operation.kind === "delete") {
+          await mutate(`/api/entries/${operation.entryId}`, "DELETE", {
+            expectedRevision: operation.expectedRevision,
+          });
+        } else if (operation.kind === "create") {
+          const response = await mutate<{ entry: EncryptedEntryEnvelope }>(
+            "/api/entries",
+            "POST",
+            operation.envelope,
+          );
+          envelopeRef.current.set(response.entry.id, response.entry);
+        } else if (operation.kind === "update") {
+          const response = await mutate<{ entry: EncryptedEntryEnvelope }>(
+            `/api/entries/${operation.envelope.id}`,
+            "PUT",
+            {
+              expectedRevision: operation.expectedRevision,
+              envelope: operation.envelope,
+            },
+          );
+          envelopeRef.current.set(response.entry.id, response.entry);
+        } else {
+          const response = await mutate<{
+            entry: EncryptedEntryEnvelope;
+            events: TreeGrowthEvent[];
+          }>(`/api/entries/${operation.envelope.id}/complete`, "POST", {
+            expectedRevision: operation.expectedRevision,
+            envelope: operation.envelope,
+            completion: operation.completion,
+          });
+          envelopeRef.current.set(response.entry.id, response.entry);
+          const payload = await decryptEntryPayload(
+            vaultKey,
+            bootstrap.account.id,
+            response.entry,
+          );
+          setEntries((current) => [
+            {
+              id: response.entry.id,
+              payload,
+              createdAt: response.entry.clientCreatedAt,
+              updatedAt: response.entry.clientUpdatedAt,
+              ...(response.entry.completedAt === undefined
+                ? {}
+                : { completedAt: response.entry.completedAt }),
+              ...(response.entry.localDay === undefined
+                ? {}
+                : { localDay: response.entry.localDay }),
+            },
+            ...current.filter((entry) => entry.id !== response.entry.id),
+          ]);
+          const unseenGrowth = appendUnseenGrowthEvents(response.events);
+          if (unseenGrowth.length > 0) {
+            enqueueGrowthReveal(unseenGrowth, response.entry.id);
+            navigate({ name: "home" });
+          }
+        }
+
+        const entryId =
+          operation.kind === "delete"
+            ? operation.entryId
+            : operation.envelope.id;
+        await removeEncryptedOperation(operation.operationId);
+        await removeEncryptedDraft(bootstrap.account.id, entryId);
+        setEnvelopes(Array.from(envelopeRef.current.values()));
+      } catch {
+        // Preserve ordering and retry the remaining encrypted operations later.
+        break;
+      }
+    }
+  }, [
+    appendUnseenGrowthEvents,
+    bootstrap,
+    enqueueGrowthReveal,
+    mutate,
+    navigate,
+    vaultKey,
+  ]);
+
+  useEffect(() => {
+    if (!bootstrap || !vaultKey || loadingMessage) return;
+    const flush = () => void flushEncryptedOutbox();
+    window.addEventListener("online", flush);
+    if (navigator.onLine) flush();
+    return () => window.removeEventListener("online", flush);
+  }, [bootstrap, flushEncryptedOutbox, loadingMessage, vaultKey]);
+
+  useEffect(() => {
+    if (!vaultKey) return;
+    const inactivityLimit = 15 * 60 * 1000;
+    let lastActivity = Date.now();
+    let timer = window.setTimeout(lockIfInactive, inactivityLimit);
+
+    function lockJournal() {
+      setVaultKey(null);
+      setEntries([]);
+      setSelectedEntryId(null);
+      setGrowthRevealQueue([]);
+      navigate({ name: "home" });
+    }
+
+    function lockIfInactive() {
+      const remaining = inactivityLimit - (Date.now() - lastActivity);
+      if (remaining <= 0) {
+        lockJournal();
+        return;
+      }
+      timer = window.setTimeout(lockIfInactive, remaining);
+    }
+
+    function noteActivity() {
+      lastActivity = Date.now();
+      window.clearTimeout(timer);
+      timer = window.setTimeout(lockIfInactive, inactivityLimit);
+    }
+
+    function checkVisibility() {
+      if (document.visibilityState === "visible") lockIfInactive();
+    }
+
+    const activityEvents = ["pointerdown", "keydown", "touchstart"] as const;
+    activityEvents.forEach((eventName) =>
+      window.addEventListener(eventName, noteActivity, { passive: true }),
+    );
+    document.addEventListener("visibilitychange", checkVisibility);
+    return () => {
+      window.clearTimeout(timer);
+      activityEvents.forEach((eventName) =>
+        window.removeEventListener(eventName, noteActivity),
+      );
+      document.removeEventListener("visibilitychange", checkVisibility);
+    };
+  }, [navigate, vaultKey]);
 
   const updateCompletedEntry = async (
     entryId: string,
@@ -369,30 +670,45 @@ export function SeedJournalApp({
     envelopeRef.current.delete(entryId);
     setEnvelopes(Array.from(envelopeRef.current.values()));
     setEntries((current) => current.filter((entry) => entry.id !== entryId));
-    setGrowthEvents((current) =>
-      current.map((event) =>
+    const anonymizedGrowth = growthEventsRef.current.map((event) =>
         event.entryId === entryId ? { ...event, entryId: null } : event,
-      ),
     );
+    growthEventsRef.current = anonymizedGrowth;
+    setGrowthEvents(anonymizedGrowth);
   };
+
+  const displayedGrowthEvents = useMemo(
+    () =>
+      visualTestUnits === null
+        ? growthEvents
+        : previewGrowthForUnits(visualTestUnits, visualPreviewEpoch),
+    [growthEvents, visualPreviewEpoch, visualTestUnits],
+  );
 
   const snapshot = useMemo<TreeSnapshot>(
     () => ({
       treeId: bootstrap?.account.id ?? "seed-journal",
       rootSeed: bootstrap?.account.treeSeed ?? "moonlit-sapling",
-      algorithmVersion: 1,
+      algorithmVersion: bootstrap?.account.treeAlgorithmVersion ?? 2,
       totalEntries: entries.filter((entry) => entry.completedAt).length,
       distinctJournalDays: new Set(
         entries.map((entry) => entry.localDay).filter(Boolean),
       ).size,
-      events: growthEvents,
+      events: displayedGrowthEvents,
+      memoryLineage: Object.fromEntries(
+        entries.flatMap((entry) =>
+          entry.payload.parentEntryId
+            ? [[entry.id, entry.payload.parentEntryId] as const]
+            : [],
+        ),
+      ),
     }),
-    [bootstrap, entries, growthEvents],
+    [bootstrap, displayedGrowthEvents, entries],
   );
 
   const memories = useMemo<GardenMemoryRecord[]>(() => {
     const byId = new Map(entries.map((entry) => [entry.id, entry]));
-    return growthEvents.flatMap((event) => {
+    return displayedGrowthEvents.flatMap((event) => {
       if (!event.entryId || !event.kind.startsWith("memory_")) return [];
       const entry = byId.get(event.entryId);
       if (!entry) return [];
@@ -414,7 +730,7 @@ export function SeedJournalApp({
         },
       ];
     });
-  }, [entries, growthEvents]);
+  }, [displayedGrowthEvents, entries]);
 
   if (error) return <StatusScreen title="The garden is resting" detail={error} />;
   if (!bootstrap || vault === undefined) {
@@ -444,35 +760,33 @@ export function SeedJournalApp({
     setActiveEntryId(crypto.randomUUID());
     navigate({ name: "new", parentEntryId: entryId });
   };
+  const pendingGrowthReveal = growthRevealQueue[0] ?? null;
 
+  let routeContent: ReactNode;
   if (route.name === "new") {
-    return (
-      <AppFrame snapshot={snapshot} gardenMode="ambient">
-        <main className="sj-route-surface" id="main-content">
-          <JournalRitual
-            key={activeEntryId}
-            entryId={activeEntryId}
-            localDay={localDay()}
-            identitySeed={bootstrap.account.treeSeed}
-            kind={route.parentEntryId ? "revisit" : "entry"}
-            parentEntryId={route.parentEntryId}
-            previousEntries={entries}
-            previousFollowUpIds={entries
-              .map((entry) => entry.payload.followUp?.id)
-              .filter((id): id is string => Boolean(id))}
-            onAutosave={({ entry }) => saveDraft(activeEntryId, entry)}
-            onComplete={({ entry, localDay: day }) =>
-              completeEntry(activeEntryId, entry, day)
-            }
-            onExit={() => navigate({ name: "home" })}
-          />
-        </main>
-      </AppFrame>
+    routeContent = (
+      <main className="sj-route-surface" id="main-content">
+        <JournalRitual
+          key={activeEntryId}
+          entryId={activeEntryId}
+          localDay={localDay()}
+          identitySeed={bootstrap.account.treeSeed}
+          kind={route.parentEntryId ? "revisit" : "entry"}
+          parentEntryId={route.parentEntryId}
+          previousEntries={entries}
+          previousFollowUpIds={entries
+            .map((entry) => entry.payload.followUp?.id)
+            .filter((id): id is string => Boolean(id))}
+          onAutosave={({ entry }) => saveDraft(activeEntryId, entry)}
+          onComplete={({ entry, localDay: day }) =>
+            completeEntry(activeEntryId, entry, day)
+          }
+          onExit={() => navigate({ name: "home" })}
+        />
+      </main>
     );
-  }
-
-  if (route.name === "archive") {
-    return (
+  } else if (route.name === "archive") {
+    routeContent = (
       <ArchiveView
         entries={entries}
         onOpenEntry={openEntry}
@@ -483,12 +797,10 @@ export function SeedJournalApp({
         onBack={() => navigate({ name: "home" })}
       />
     );
-  }
-
-  if (route.name === "entry") {
+  } else if (route.name === "entry") {
     const entry = entries.find((item) => item.id === route.entryId);
     if (!entry) {
-      return (
+      routeContent = (
         <StatusScreen
           title="Memory unavailable"
           detail="This memory may have been removed."
@@ -496,26 +808,27 @@ export function SeedJournalApp({
           actionLabel="Return to journal"
         />
       );
+    } else {
+      routeContent = (
+        <EntryReader
+          entry={entry}
+          onBack={() => navigate({ name: "archive" })}
+          onSave={updateCompletedEntry}
+          onDelete={deleteEntry}
+          onRevisit={revisit}
+        />
+      );
     }
-    return (
-      <EntryReader
-        entry={entry}
-        onBack={() => navigate({ name: "archive" })}
-        onSave={updateCompletedEntry}
-        onDelete={deleteEntry}
-        onRevisit={revisit}
-      />
-    );
-  }
-
-  if (route.name === "settings") {
-    return (
+  } else if (route.name === "settings") {
+    routeContent = (
       <SettingsScreen
         displayName={displayName}
         vault={vault}
         envelopes={envelopes}
         entries={entries}
         growthEvents={growthEvents}
+        rootSeed={snapshot.rootSeed}
+        treeAlgorithmVersion={snapshot.algorithmVersion}
         onBack={() => navigate({ name: "home" })}
         onLock={() => {
           setVaultKey(null);
@@ -539,23 +852,62 @@ export function SeedJournalApp({
         }}
       />
     );
+  } else if (pendingGrowthReveal) {
+    const totalGrowthUnits = snapshot.events.reduce(
+      (total, event) => total + event.growthUnits,
+      0,
+    );
+    routeContent = (
+      <main className="sj-growth-reveal-surface" id="main-content">
+        <GrowthReveal
+          delta={pendingGrowthReveal.delta}
+          stage={stageForGrowthUnits(totalGrowthUnits)}
+          reducedMotion={reducedMotion}
+          treeId={snapshot.treeId}
+          onReturn={() => {
+            const remaining = growthRevealQueue.slice(1);
+            setGrowthRevealQueue(remaining);
+            setSelectedEntryId(remaining[0]?.entryId ?? null);
+          }}
+        />
+      </main>
+    );
+  } else {
+    routeContent = (
+      <TreeFirstHome
+        snapshot={snapshot}
+        memories={memories}
+        selectedEntryId={selectedEntryId}
+        onSelectEntry={setSelectedEntryId}
+        onBeginJournal={() => {
+          setActiveEntryId(crypto.randomUUID());
+          navigate({ name: "new" });
+        }}
+        onOpenArchive={() => navigate({ name: "archive" })}
+        onOpenSettings={() => navigate({ name: "settings" })}
+        onLock={() => setVaultKey(null)}
+        onReadEntry={openEntry}
+        onRevisitEntry={revisit}
+      />
+    );
   }
 
+  const gardenMode =
+    route.name === "home"
+      ? "active"
+      : route.name === "new"
+        ? "ambient"
+        : "paused";
+
   return (
-    <TreeFirstHome
+    <AppFrame
       snapshot={snapshot}
-      memories={memories}
-      greeting={`Welcome back, ${firstName(displayName)}.`}
-      onBeginJournal={() => {
-        setActiveEntryId(crypto.randomUUID());
-        navigate({ name: "new" });
-      }}
-      onOpenArchive={() => navigate({ name: "archive" })}
-      onOpenSettings={() => navigate({ name: "settings" })}
-      onLock={() => setVaultKey(null)}
-      onReadEntry={openEntry}
-      onRevisitEntry={revisit}
-    />
+      gardenMode={gardenMode}
+      selectedEntryId={selectedEntryId}
+      onSelectEntry={setSelectedEntryId}
+    >
+      {routeContent}
+    </AppFrame>
   );
 }
 
@@ -650,6 +1002,8 @@ function SettingsScreen({
   envelopes,
   entries,
   growthEvents,
+  rootSeed,
+  treeAlgorithmVersion,
   onBack,
   onLock,
   onChangePassphrase,
@@ -660,6 +1014,8 @@ function SettingsScreen({
   envelopes: EncryptedEntryEnvelope[];
   entries: DecryptedJournalEntry[];
   growthEvents: TreeGrowthEvent[];
+  rootSeed: string;
+  treeAlgorithmVersion: 1 | 2;
   onBack: () => void;
   onLock: () => void;
   onChangePassphrase: (current: string, next: string) => Promise<void>;
@@ -680,7 +1036,7 @@ function SettingsScreen({
   };
 
   return (
-    <AppFrame gardenMode="paused">
+    <>
       <SeedJournalHeader onBack={onBack} />
       <main className="sj-settings" id="main-content">
         <p className="sj-eyebrow">{displayName}</p>
@@ -703,6 +1059,10 @@ function SettingsScreen({
               onClick={() =>
                 download(
                   buildEncryptedArchive({
+                    tree: {
+                      rootSeed,
+                      algorithmVersion: treeAlgorithmVersion,
+                    },
                     vault,
                     entries: envelopes,
                     growthEvents,
@@ -799,7 +1159,7 @@ function SettingsScreen({
           <SignOut aria-hidden /> Sign out
         </a>
       </main>
-    </AppFrame>
+    </>
   );
 }
 
@@ -851,13 +1211,30 @@ async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   return body as T;
 }
 
+function isNetworkFailure(caught: unknown): boolean {
+  return (
+    (typeof navigator !== "undefined" && !navigator.onLine) ||
+    caught instanceof TypeError
+  );
+}
+
 function localDay() {
   const date = new Date();
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 }
 
-function firstName(name: string) {
-  return name.trim().split(/\s+/u)[0] || "gardener";
+function useReducedMotionPreference() {
+  const [reducedMotion, setReducedMotion] = useState(false);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = () => setReducedMotion(query.matches);
+    update();
+    query.addEventListener("change", update);
+    return () => query.removeEventListener("change", update);
+  }, []);
+
+  return reducedMotion;
 }
 
 function routeFromPath(path: string): Route {
@@ -875,6 +1252,20 @@ function pathForRoute(route: Route) {
   if (route.name === "entry") return `/journal/${route.entryId}`;
   if (route.name === "settings") return "/settings";
   return "/";
+}
+
+function readVisualTestUnits(): number | null {
+  if (
+    process.env.NODE_ENV !== "development" ||
+    typeof window === "undefined"
+  ) {
+    return null;
+  }
+
+  const requested = Number(
+    new URLSearchParams(window.location.search).get("treeUnits"),
+  );
+  return [0, 1, 12, 48, 96, 192].includes(requested) ? requested : null;
 }
 
 function previewEntry(now: number): DecryptedJournalEntry {
@@ -905,6 +1296,68 @@ function previewEntry(now: number): DecryptedJournalEntry {
       },
     },
   };
+}
+
+function previewGrowthForUnits(
+  targetUnits: number,
+  now: number,
+): TreeGrowthEvent[] {
+  const entryId = "00000000-0000-4000-8000-000000000011";
+  const events: TreeGrowthEvent[] = [];
+  let sequence = 0;
+  let totalUnits = 0;
+  let twigCount = 0;
+  const add = (
+    kind: TreeGrowthEvent["kind"],
+    growthUnits: TreeGrowthEvent["growthUnits"],
+    memory: boolean,
+  ) => {
+    sequence += 1;
+    events.push({
+      id: `visual-stage-${targetUnits}-${sequence}`,
+      sequence,
+      entryId: memory ? entryId : null,
+      occurredAt: now + sequence,
+      localDate: localDay(),
+      kind,
+      growthUnits,
+      seed: 17_171 + sequence * 7_919,
+    });
+  };
+
+  while (totalUnits < targetUnits) {
+    const remaining = targetUnits - totalUnits;
+    const units: 1 | 2 | 4 | 6 =
+      remaining >= 6 ? 6 : remaining >= 4 ? 4 : remaining >= 2 ? 2 : 1;
+    const previousTwigMilestone = Math.floor(totalUnits / 12);
+    totalUnits += units;
+    const nextTwigMilestone = Math.floor(totalUnits / 12);
+
+    add("leaf", 0, false);
+    add(
+      units === 6
+        ? "memory_luminous_blossom"
+        : units === 4
+          ? "memory_blossom"
+          : units === 2
+            ? "memory_bud"
+            : "memory_leaf",
+      units,
+      true,
+    );
+
+    for (
+      let milestone = previousTwigMilestone;
+      milestone < nextTwigMilestone;
+      milestone += 1
+    ) {
+      twigCount += 1;
+      add("twig", 0, false);
+      if (twigCount % 4 === 0) add("branch", 0, false);
+    }
+  }
+
+  return events;
 }
 
 function previewGrowth(now: number): TreeGrowthEvent[] {

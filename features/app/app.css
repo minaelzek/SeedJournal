@@ -4,6 +4,32 @@
   min-height: 100svh;
 }
 
+.sj-growth-reveal-surface {
+  position: fixed;
+  z-index: 24;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding:
+    0 max(var(--space-5), env(safe-area-inset-right))
+    max(var(--space-6), env(safe-area-inset-bottom))
+    max(var(--space-5), env(safe-area-inset-left));
+  background: linear-gradient(
+    to bottom,
+    transparent 44%,
+    color-mix(in srgb, var(--color-background) 28%, transparent) 62%,
+    color-mix(in srgb, var(--color-background) 92%, transparent) 100%
+  );
+  pointer-events: none;
+}
+
+.sj-growth-reveal-surface > section {
+  min-height: min(27rem, 52dvh) !important;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+
 .sj-vault-screen,
 .sj-status-screen {
   min-height: 100svh;

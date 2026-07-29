@@ -98,6 +98,7 @@ export function JournalRitual({
   const [completionError, setCompletionError] = useState<string>();
   const [isCompleting, setIsCompleting] = useState(false);
   const saveVersion = useRef(0);
+  const pendingCompletionId = useRef<string | undefined>(undefined);
 
   const previousBodies = useMemo(
     () => previousEntries.slice(0, 10).map((entry) => entry.payload.body),
@@ -144,12 +145,12 @@ export function JournalRitual({
   };
 
   const complete = async (nextState: RitualState) => {
-    const completionId = crypto.randomUUID();
+    const completionId =
+      pendingCompletionId.current ?? (pendingCompletionId.current = crypto.randomUUID());
     const completed = ritualReducer(nextState, {
       type: "nurture",
       completionId,
     });
-    dispatch({ type: "nurture", completionId });
     setCompletionError(undefined);
     setIsCompleting(true);
     try {
@@ -158,9 +159,13 @@ export function JournalRitual({
         localDay,
         stage: "nurtured",
       });
+      dispatch({ type: "nurture", completionId });
+      pendingCompletionId.current = undefined;
     } catch {
       setCompletionError(
-        "Your reflection is still here. We could not nurture the tree yet.",
+        navigator.onLine
+          ? "Your reflection is still here. The garden could not receive it yet."
+          : "Your reflection is saved on this device. The garden will receive it when you reconnect.",
       );
     } finally {
       setIsCompleting(false);
@@ -243,6 +248,7 @@ export function JournalRitual({
         <SeedInsightStep
           state={state}
           isCompleting={isCompleting}
+          completionError={completionError}
           onBack={() => {
             if (state.entry.followUp) {
               dispatch({
@@ -272,10 +278,7 @@ export function JournalRitual({
 
     return (
       <NurturedStep
-        state={state}
         isCompleting={isCompleting}
-        error={completionError}
-        onRetry={() => void onComplete({ entry: state.entry, localDay, stage: "nurtured" })}
         onDone={onExit}
       />
     );
@@ -529,12 +532,14 @@ function FollowUpStep({
 function SeedInsightStep({
   state,
   isCompleting,
+  completionError,
   onBack,
   onInsight,
   onNurture,
 }: {
   state: RitualState;
   isCompleting: boolean;
+  completionError?: string;
   onBack: () => void;
   onInsight: (value: string) => void;
   onNurture: () => void;
@@ -585,33 +590,26 @@ function SeedInsightStep({
           )}
           {isCompleting ? "Nurturing…" : "Nurture the tree"}
         </button>
+        {completionError ? (
+          <p
+            role="alert"
+            className="mt-4 max-w-[520px] font-[var(--font-ui)] text-[14px] leading-5 text-[var(--color-text-secondary)]"
+          >
+            {completionError}
+          </p>
+        ) : null}
       </div>
     </div>
   );
 }
 
 function NurturedStep({
-  state,
   isCompleting,
-  error,
-  onRetry,
   onDone,
 }: {
-  state: RitualState;
   isCompleting: boolean;
-  error?: string;
-  onRetry: () => void;
   onDone?: () => void;
 }) {
-  const form = state.entry.growth?.memoryForm ?? "leaf";
-  const message =
-    form === "luminous-blossom"
-      ? "A luminous blossom opened on your tree."
-      : form === "blossom"
-        ? "A new blossom opened on your tree."
-        : form === "bud"
-          ? "A new bud formed on your tree."
-          : "A new leaf unfolded on your tree.";
   return (
     <div className="mx-auto max-w-[520px] text-center" aria-live="polite">
       <span className="mx-auto mb-8 inline-flex size-14 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-blossom-light)]">
@@ -622,35 +620,19 @@ function NurturedStep({
         )}
       </span>
       <h1 className="text-balance font-[var(--font-poetic)] text-[30px] leading-[38px] text-[var(--color-text-primary)] sm:text-[36px] sm:leading-[44px]">
-        {message}
+        Your reflection has taken its place.
       </h1>
       <p className="mt-4 font-[var(--font-ui)] text-[15px] leading-6 text-[var(--color-text-secondary)]">
         Your reflection is part of the living record now.
       </p>
-      {error ? (
-        <div
-          role="alert"
-          className="mt-8 rounded-[var(--radius-surface)] border border-[var(--color-destructive)] p-4 text-left font-[var(--font-ui)] text-[14px] leading-5"
-        >
-          <p>{error}</p>
-          <button
-            type="button"
-            className={`${secondaryButton} mt-4`}
-            onClick={onRetry}
-          >
-            Try again
-          </button>
-        </div>
-      ) : (
-        <button
-          type="button"
-          className={`${primaryButton} mt-10`}
-          onClick={onDone}
-          disabled={isCompleting}
-        >
-          Return to the garden
-        </button>
-      )}
+      <button
+        type="button"
+        className={`${primaryButton} mt-10`}
+        onClick={onDone}
+        disabled={isCompleting}
+      >
+        Return to the garden
+      </button>
     </div>
   );
 }

@@ -1,13 +1,11 @@
 "use client";
 
-import { useState } from "react";
 import { ArrowRightIcon, PenNibIcon } from "@phosphor-icons/react";
 import type { TreeSnapshot } from "@/lib/contracts";
 import {
   MemoryNavigator,
   type GardenMemoryRecord,
 } from "@/features/garden/MemoryNavigator";
-import { AppFrame } from "./AppFrame";
 import { SeedJournalHeader } from "./SeedJournalHeader";
 import "./shell.css";
 
@@ -20,7 +18,8 @@ export interface TreeFirstHomeProps {
   onLock?: () => void;
   onReadEntry?: (entryId: string) => void;
   onRevisitEntry?: (entryId: string) => void;
-  greeting?: string;
+  selectedEntryId?: string | null;
+  onSelectEntry?: (entryId: string | null) => void;
 }
 
 export function TreeFirstHome({
@@ -32,43 +31,33 @@ export function TreeFirstHome({
   onLock,
   onReadEntry,
   onRevisitEntry,
-  greeting = "Your tree is listening.",
+  selectedEntryId = null,
+  onSelectEntry,
 }: TreeFirstHomeProps) {
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const growthUnits = snapshot.events.reduce(
+    (total, event) => total + event.growthUnits,
+    0,
+  );
 
   return (
-    <AppFrame
-      snapshot={snapshot}
-      gardenMode="active"
-      selectedEntryId={selectedEntryId}
-      onSelectEntry={setSelectedEntryId}
-    >
+    <>
       <SeedJournalHeader
         onOpenArchive={onOpenArchive}
         onOpenSettings={onOpenSettings}
         onLock={onLock}
       />
       <main className="sj-home" id="main-content">
-        <div className="sj-home__quiet-copy" aria-live="polite">
-          <p>{greeting}</p>
-          <span>
-            {memories.length === 0
-              ? "A first reflection can become its first leaf."
-              : `${memories.length} ${
-                  memories.length === 1 ? "memory rests" : "memories rest"
-                } among its branches.`}
-          </span>
-        </div>
-
-        <div className="sj-home__memory-control">
-          <MemoryNavigator
-            memories={memories}
-            selectedEntryId={selectedEntryId}
-            onSelectEntry={setSelectedEntryId}
-            onReadEntry={onReadEntry}
-            onRevisitEntry={onRevisitEntry}
-          />
-        </div>
+        {memories.length > 0 ? (
+          <div className="sj-home__memory-control">
+            <MemoryNavigator
+              memories={memories}
+              selectedEntryId={selectedEntryId}
+              onSelectEntry={(entryId) => onSelectEntry?.(entryId)}
+              onReadEntry={onReadEntry}
+              onRevisitEntry={onRevisitEntry}
+            />
+          </div>
+        ) : null}
 
         <button
           className="sj-journal-cta"
@@ -76,11 +65,10 @@ export function TreeFirstHome({
           onClick={onBeginJournal}
         >
           <PenNibIcon aria-hidden weight="regular" />
-          <span>Journal</span>
+          <span>{growthUnits === 0 ? "Begin a reflection" : "Journal"}</span>
           <ArrowRightIcon aria-hidden />
         </button>
       </main>
-    </AppFrame>
+    </>
   );
 }
-

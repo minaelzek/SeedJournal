@@ -15,11 +15,16 @@ export const accounts = sqliteTable(
     id: text("id").primaryKey(),
     authEmail: text("auth_email").notNull(),
     treeSeed: text("tree_seed").notNull(),
+    treeAlgorithmVersion: integer("tree_algorithm_version").notNull().default(2),
     createdAt: integer("created_at").notNull(),
     updatedAt: integer("updated_at").notNull(),
   },
   (table) => [
     uniqueIndex("accounts_auth_email_unique").on(table.authEmail),
+    check(
+      "accounts_tree_algorithm_version_check",
+      sql`${table.treeAlgorithmVersion} IN (1, 2)`,
+    ),
   ],
 );
 

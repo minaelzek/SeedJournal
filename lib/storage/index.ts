@@ -2,6 +2,7 @@ export {
   clearEncryptedLocalData,
   enqueueEncryptedOperation,
   getEncryptedDraft,
+  listEncryptedDrafts,
   listEncryptedOperations,
   putEncryptedDraft,
   removeEncryptedDraft,

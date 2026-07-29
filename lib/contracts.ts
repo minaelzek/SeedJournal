@@ -29,6 +29,16 @@ export type GrowthKind =
   | "twig"
   | "branch";
 
+export type TreeAlgorithmVersion = 1 | 2;
+
+export type TreeStage =
+  | "seed"
+  | "sprout"
+  | "sapling"
+  | "young-tree"
+  | "established"
+  | "mature";
+
 export interface ReflectionSnapshot {
   engineVersion: "1";
   mode: "english-rules" | "language-neutral";
@@ -98,10 +108,16 @@ export interface TreeGrowthEvent {
 export interface TreeSnapshot {
   treeId: string;
   rootSeed: string;
-  algorithmVersion: 1;
+  algorithmVersion: TreeAlgorithmVersion;
   totalEntries: number;
   distinctJournalDays: number;
   events: TreeGrowthEvent[];
+  /**
+   * Decrypted, in-memory-only revisit relationships. This map is never stored
+   * server-side and exists solely to place a revisit near its originating
+   * memory in the local botanical graph.
+   */
+  memoryLineage?: Record<string, string>;
 }
 
 export interface TreeGrowthDelta {

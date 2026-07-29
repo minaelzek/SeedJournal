@@ -1,13 +1,18 @@
 import type {
   EncryptedEntryEnvelope,
   JournalEntryPayloadV1,
+  TreeAlgorithmVersion,
   TreeGrowthEvent,
 } from "@/lib/contracts";
 import type { ClientVaultMetadata } from "@/lib/crypto";
 
 export interface EncryptedSeedJournalArchive {
-  archiveVersion: 1;
+  archiveVersion: 2;
   exportedAt: number;
+  tree: {
+    rootSeed: string;
+    algorithmVersion: TreeAlgorithmVersion;
+  };
   vault: ClientVaultMetadata & { revision: number };
   entries: EncryptedEntryEnvelope[];
   growthEvents: TreeGrowthEvent[];
@@ -17,8 +22,9 @@ export function buildEncryptedArchive(
   archive: Omit<EncryptedSeedJournalArchive, "archiveVersion" | "exportedAt">,
 ): Blob {
   const payload: EncryptedSeedJournalArchive = {
-    archiveVersion: 1,
+    archiveVersion: 2,
     exportedAt: Date.now(),
+    tree: archive.tree,
     vault: archive.vault,
     entries: archive.entries,
     growthEvents: archive.growthEvents,

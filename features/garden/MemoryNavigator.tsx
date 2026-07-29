@@ -123,13 +123,7 @@ export function MemoryNavigator({
               <div className="sj-memory-preview__meta">
                 <span className="sj-memory-preview__form">
                   <FlowerLotusIcon aria-hidden weight="regular" />
-                  {selected.form === "leaf"
-                    ? "Memory leaf"
-                    : selected.form === "bud"
-                      ? "Memory bud"
-                      : selected.form === "luminous-blossom"
-                        ? "Luminous blossom"
-                        : "Memory blossom"}
+                  Tree memory
                 </span>
                 <Dialog.Close
                   className="sj-icon-button"
@@ -172,4 +166,3 @@ export function MemoryNavigator({
     </>
   );
 }
-

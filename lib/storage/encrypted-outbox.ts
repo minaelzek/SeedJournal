@@ -85,6 +85,23 @@ export async function getEncryptedDraft(
   return result?.envelope ?? null;
 }
 
+export async function listEncryptedDrafts(
+  accountId: string,
+): Promise<EncryptedEntryEnvelope[]> {
+  const database = await openDatabase();
+  const drafts = await requestToPromise<StoredDraft[]>(
+    database
+      .transaction(DRAFT_STORE, "readonly")
+      .objectStore(DRAFT_STORE)
+      .index("byAccount")
+      .getAll(IDBKeyRange.only(accountId)),
+  );
+  database.close();
+  return drafts
+    .sort((left, right) => left.storedAt - right.storedAt)
+    .map((draft) => draft.envelope);
+}
+
 export async function removeEncryptedDraft(
   accountId: string,
   entryId: string,

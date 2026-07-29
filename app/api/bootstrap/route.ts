@@ -30,6 +30,7 @@ export const GET = withApi(async (request: Request) => {
       account: {
         id: account.id,
         treeSeed: account.treeSeed,
+        treeAlgorithmVersion: account.treeAlgorithmVersion,
       },
       vault: { configured: Boolean(vault) },
       journal: { entryCount },
