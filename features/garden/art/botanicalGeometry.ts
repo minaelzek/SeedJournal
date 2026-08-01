@@ -159,6 +159,21 @@ export function geometryFromBranchBuffers(
   );
   geometry.setAttribute("normal", new THREE.BufferAttribute(buffers.normals, 3));
   geometry.setAttribute("uv", new THREE.BufferAttribute(buffers.uvs, 2));
+  geometry.setAttribute(
+    "growthBirthSequence",
+    new THREE.BufferAttribute(
+      Float32Array.from(buffers.birthSequence),
+      1,
+    ),
+  );
+  geometry.setAttribute(
+    "growthAxisProgress",
+    new THREE.BufferAttribute(buffers.axisProgress, 1),
+  );
+  geometry.setAttribute(
+    "growthWindWeight",
+    new THREE.BufferAttribute(buffers.windWeight, 1),
+  );
   if (visibleBranchIndices) {
     const visibleIndexCount = [...visibleBranchIndices].reduce(
       (count, branchIndex) => count + buffers.ranges[branchIndex * 4 + 3],
@@ -236,9 +251,10 @@ export function foliageFromOrganBuffers(
 
 export function buildPointedLeafGeometry(): THREE.BufferGeometry {
   const shape = new THREE.Shape();
-  shape.moveTo(0, -0.56);
-  shape.bezierCurveTo(-0.23, -0.27, -0.31, 0.08, 0, 0.6);
-  shape.bezierCurveTo(0.31, 0.08, 0.23, -0.27, 0, -0.56);
+  shape.moveTo(0, -0.5);
+  shape.bezierCurveTo(-0.34, -0.28, -0.42, 0.12, -0.06, 0.56);
+  shape.bezierCurveTo(-0.03, 0.6, 0.03, 0.6, 0.06, 0.56);
+  shape.bezierCurveTo(0.42, 0.12, 0.34, -0.28, 0, -0.5);
   const geometry = new THREE.ShapeGeometry(shape, 10);
   geometry.rotateX(-0.12);
 
@@ -246,25 +262,27 @@ export function buildPointedLeafGeometry(): THREE.BufferGeometry {
   for (let index = 0; index < position.count; index += 1) {
     const x = position.getX(index);
     const y = position.getY(index);
-    position.setZ(index, (1 - Math.abs(y) / 0.6) * 0.045 - Math.abs(x) * 0.03);
+    position.setZ(index, (1 - Math.abs(y) / 0.6) * 0.052 - Math.abs(x) * 0.025);
   }
   geometry.computeVertexNormals();
   return geometry;
 }
 
 export function buildNotchedPetalGeometry(): THREE.BufferGeometry {
+  // Classic sakura petal: soft heart notch at the tip, wider mid-body.
   const shape = new THREE.Shape();
-  shape.moveTo(0, -0.08);
-  shape.bezierCurveTo(-0.28, 0.04, -0.38, 0.42, -0.17, 0.62);
-  shape.bezierCurveTo(-0.08, 0.69, -0.035, 0.61, 0, 0.54);
-  shape.bezierCurveTo(0.035, 0.61, 0.08, 0.69, 0.17, 0.62);
-  shape.bezierCurveTo(0.38, 0.42, 0.28, 0.04, 0, -0.08);
-  const geometry = new THREE.ShapeGeometry(shape, 12);
+  shape.moveTo(0, -0.06);
+  shape.bezierCurveTo(-0.34, 0.02, -0.46, 0.38, -0.22, 0.66);
+  shape.bezierCurveTo(-0.12, 0.76, -0.045, 0.68, 0, 0.58);
+  shape.bezierCurveTo(0.045, 0.68, 0.12, 0.76, 0.22, 0.66);
+  shape.bezierCurveTo(0.46, 0.38, 0.34, 0.02, 0, -0.06);
+  const geometry = new THREE.ShapeGeometry(shape, 14);
   const position = geometry.getAttribute("position");
   for (let index = 0; index < position.count; index += 1) {
     const y = position.getY(index);
     const x = position.getX(index);
-    position.setZ(index, y * y * 0.12 - Math.abs(x) * 0.04);
+    // Gentle cup — reads as soft petal, not a flat chip.
+    position.setZ(index, y * y * 0.16 - Math.abs(x) * 0.05 + 0.02);
   }
   geometry.computeVertexNormals();
   return geometry;
@@ -276,13 +294,14 @@ export function buildSakuraBlossomGeometry(): THREE.BufferGeometry {
     const angle = (index / 5) * Math.PI * 2;
     const petal = source.clone();
     petal.rotateZ(angle);
-    petal.rotateX(0.22 + (index % 2) * 0.11);
-    petal.rotateY((index - 2) * 0.045);
+    petal.rotateX(0.28 + (index % 2) * 0.08);
+    petal.rotateY((index - 2) * 0.04);
     petal.translate(
-      Math.sin(angle) * 0.018,
-      Math.cos(angle) * 0.018,
-      (index % 3) * 0.012,
+      Math.sin(angle) * 0.028,
+      Math.cos(angle) * 0.028,
+      (index % 3) * 0.01,
     );
+    petal.scale(1.12, 1.12, 1.12);
     return petal;
   });
   const merged = mergeGeometries(petals, false);

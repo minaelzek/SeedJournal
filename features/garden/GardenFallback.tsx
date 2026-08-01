@@ -295,9 +295,17 @@ export function GardenFallback({
       ).slice(0, 850);
       visibleFoliage.forEach((node) => {
         const point = project(node.position);
+        const kindBoost =
+          node.kind === "blossom" || node.kind === "luminous-blossom"
+            ? 1.55
+            : node.kind === "bud"
+              ? 1.25
+              : node.kind === "leaf"
+                ? 0.72
+                : 1;
         const organScale = Math.max(
           0.42,
-          node.scale * scale * (projection ? 0.015 : 0.036),
+          node.scale * scale * (projection ? 0.015 : 0.036) * kindBoost,
         );
         if (node.kind === "radicle") {
           context.save();

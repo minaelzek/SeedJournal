@@ -1,16 +1,33 @@
 "use client";
 
-import { ArrowRight, Check } from "@phosphor-icons/react";
+import { ArrowRight, Sparkle } from "@phosphor-icons/react";
 import { useEffect, useMemo, useRef, useState } from "react";
-import type { TreeGrowthDelta, TreeStage } from "@/lib/contracts";
+import type {
+  GrowthKind,
+  TreeGrowthDelta,
+  TreeGrowthEvent,
+  TreeSnapshot,
+  TreeStage,
+} from "@/lib/contracts";
+import { IllustratedSakura } from "@/features/garden/illustration";
+import {
+  morphIntentForReveal,
+  presentSakura,
+  presentationAtSequence,
+  type MorphIntent,
+} from "@/features/garden/illustration/presentation";
 import { stageGrowthMessage } from "./stages";
+import "./growth.css";
 
 export interface GrowthRevealProps {
   delta: TreeGrowthDelta;
+  seedInsight?: string;
   stage: TreeStage;
   reducedMotion: boolean;
   treeId: string;
   onReturn: () => void;
+  /** Full snapshot enables on-tree sakura morph theater. */
+  snapshot?: TreeSnapshot;
 }
 
 export interface GrowthRevealStorage {
@@ -18,8 +35,26 @@ export interface GrowthRevealStorage {
   setItem(key: string, value: string): void;
 }
 
+export type GrowthFormKind = "leaf" | "bud" | "blossom" | "luminous";
+
+export interface GrowthCelebration {
+  form: GrowthFormKind;
+  formLabel: string;
+  title: string;
+  detail: string;
+  returnLabel: string;
+  morphIntent: MorphIntent;
+  kicker: string;
+}
+
 const STORAGE_PREFIX = "seed-journal:growth-reveal:";
 const shownThisSession = new Set<string>();
+
+const MORPH_MS: Record<MorphIntent, number> = {
+  micro: 900,
+  hanami: 1700,
+  "stage-cross": 2000,
+};
 
 export function growthRevealKey(
   treeId: string,
@@ -65,8 +100,98 @@ export function markGrowthRevealPresented(
   try {
     storage?.setItem(key, "presented");
   } catch {
-    // The in-memory ledger still prevents duplicate reveals if storage is full.
+    // in-memory still prevents duplicates
   }
+}
+
+export function selectEarnedGrowthEvent(
+  delta: TreeGrowthDelta,
+): TreeGrowthEvent | undefined {
+  return (
+    delta.events.find((event) => event.kind.startsWith("memory_")) ??
+    delta.events.find((event) => event.kind === "leaf") ??
+    delta.events.at(-1)
+  );
+}
+
+export function growthFormFromKind(kind: GrowthKind | string): GrowthFormKind {
+  if (kind.includes("luminous")) return "luminous";
+  if (kind.includes("blossom")) return "blossom";
+  if (kind.includes("bud")) return "bud";
+  return "leaf";
+}
+
+export function growthFormLabel(form: GrowthFormKind): string {
+  switch (form) {
+    case "luminous":
+      return "A radiant sakura blossom opened";
+    case "blossom":
+      return "A sakura blossom opened";
+    case "bud":
+      return "A new sakura bud formed";
+    case "leaf":
+      return "Fresh leaves unfurled on your sakura";
+  }
+}
+
+/**
+ * Celebration copy — Duolingo joy, Apple restraint, sakura identity.
+ * No XP / scores / evaluation language.
+ */
+export function growthCelebration(
+  delta: TreeGrowthDelta,
+  stage: TreeStage,
+  morphIntent: MorphIntent = "micro",
+): GrowthCelebration {
+  const earned = selectEarnedGrowthEvent(delta);
+  const form = growthFormFromKind(earned?.kind ?? "leaf");
+  const formLabel = growthFormLabel(form);
+  const stageCopy = stageGrowthMessage(stage);
+  const structural = delta.events.filter(
+    (event) => event.kind === "twig" || event.kind === "branch",
+  );
+  const memoryEvents = delta.events.filter((event) =>
+    event.kind.startsWith("memory_"),
+  );
+
+  let title = stageCopy.title;
+  let detail = stageCopy.detail;
+  let kicker = "Your sakura grew";
+
+  if (morphIntent === "hanami") {
+    kicker = form === "luminous" ? "Deep noticing" : "Spring answered";
+    title =
+      form === "luminous"
+        ? "Your sakura opened in light."
+        : "Your sakura has blossomed.";
+    detail = `${formLabel}. The canopy holds what you were willing to see.`;
+  } else if (morphIntent === "stage-cross") {
+    kicker = "A new form";
+    title = stageCopy.title;
+    detail = `${formLabel}. The cherry stepped into a fuller life. ${stageCopy.detail}`;
+  } else if (structural.length > 0 && memoryEvents.length > 0) {
+    kicker = "Quiet growth";
+    const branchLike = structural.some((event) => event.kind === "branch");
+    detail = branchLike
+      ? `${formLabel.replace(/\.$/, "")}, and a new branch reached outward. ${stageCopy.detail}`
+      : `${formLabel.replace(/\.$/, "")}, and a new twig found light. ${stageCopy.detail}`;
+  } else if (memoryEvents.length > 1) {
+    kicker = "More than one gift";
+    detail = `Several quiet forms took place in the sakura. ${stageCopy.detail}`;
+  } else {
+    kicker = form === "leaf" ? "Tender care" : "A small opening";
+    detail = `${formLabel}. ${stageCopy.detail}`;
+  }
+
+  return {
+    form,
+    formLabel,
+    title,
+    detail,
+    returnLabel: "Return to your sakura",
+    morphIntent,
+    kicker,
+  };
 }
 
 function sessionStorageIfAvailable(): GrowthRevealStorage | undefined {
@@ -78,12 +203,30 @@ function sessionStorageIfAvailable(): GrowthRevealStorage | undefined {
   }
 }
 
+function revealSnapshot(
+  treeId: string,
+  delta: TreeGrowthDelta,
+  snapshot?: TreeSnapshot,
+): TreeSnapshot {
+  if (snapshot) return snapshot;
+  return {
+    treeId,
+    rootSeed: treeId,
+    algorithmVersion: 2,
+    totalEntries: delta.events.filter((event) => event.entryId).length,
+    distinctJournalDays: 1,
+    events: delta.events,
+  };
+}
+
 export function GrowthReveal({
   delta,
+  seedInsight,
   stage,
   reducedMotion,
   treeId,
   onReturn,
+  snapshot,
 }: GrowthRevealProps) {
   const exact = useMemo(() => isExactGrowthDelta(delta), [delta]);
   const storage = sessionStorageIfAvailable();
@@ -91,7 +234,31 @@ export function GrowthReveal({
     () => exact && !hasPresentedGrowthReveal(treeId, delta, storage),
   );
   const returned = useRef(false);
-  const copy = stageGrowthMessage(stage);
+  const treeSnapshot = useMemo(
+    () => revealSnapshot(treeId, delta, snapshot),
+    [delta, snapshot, treeId],
+  );
+  const morphIntent = useMemo(
+    () => morphIntentForReveal(treeSnapshot, delta),
+    [delta, treeSnapshot],
+  );
+  const celebration = useMemo(
+    () => growthCelebration(delta, stage, morphIntent),
+    [delta, morphIntent, stage],
+  );
+  const afterPresentation = useMemo(
+    () => presentationAtSequence(treeSnapshot, delta.nextSequence),
+    [delta.nextSequence, treeSnapshot],
+  );
+  const beforePresentation = useMemo(
+    () => presentationAtSequence(treeSnapshot, delta.previousSequence),
+    [delta.previousSequence, treeSnapshot],
+  );
+
+  const [revealPhase, setRevealPhase] = useState<"before" | "after">(
+    reducedMotion ? "after" : "before",
+  );
+  const [copyReady, setCopyReady] = useState(reducedMotion);
 
   useEffect(() => {
     if (shouldPresent) {
@@ -104,42 +271,105 @@ export function GrowthReveal({
     }
   }, [delta, onReturn, shouldPresent, storage, treeId]);
 
+  useEffect(() => {
+    if (!shouldPresent) return;
+    if (reducedMotion) {
+      setRevealPhase("after");
+      setCopyReady(true);
+      return;
+    }
+    // Hold "before" one frame, then morph — Apple-calm choreography
+    let copyTimer = 0;
+    const morphTimer = window.setTimeout(() => {
+      setRevealPhase("after");
+      copyTimer = window.setTimeout(() => setCopyReady(true), 280);
+    }, 420);
+    return () => {
+      window.clearTimeout(morphTimer);
+      window.clearTimeout(copyTimer);
+    };
+  }, [reducedMotion, shouldPresent]);
+
   if (!shouldPresent) return null;
+
+  const isLeap =
+    celebration.morphIntent === "hanami" ||
+    celebration.morphIntent === "stage-cross";
 
   return (
     <section
       aria-labelledby="growth-reveal-title"
       aria-describedby="growth-reveal-detail"
       aria-live="polite"
-      className={`mx-auto flex min-h-[min(34rem,100dvh)] w-full max-w-[560px] flex-col items-center justify-center px-5 text-center ${
-        reducedMotion
-          ? "opacity-100"
-          : "animate-[fade-in_360ms_var(--ease-enter)_both]"
-      }`}
+      className="sj-growth-reveal"
+      data-reduced-motion={reducedMotion || undefined}
+      data-growth-form={
+        celebration.form === "luminous" ? "blossom" : celebration.form
+      }
+      data-morph-intent={celebration.morphIntent}
+      data-copy-ready={copyReady || undefined}
+      data-leap={isLeap || undefined}
     >
-      <span className="mb-8 inline-flex size-14 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-blossom-light)]">
-        <Check aria-hidden size={24} weight="regular" />
-      </span>
-      <h1
-        id="growth-reveal-title"
-        className="text-balance font-[var(--font-poetic)] text-[30px] leading-[38px] text-[var(--color-text-primary)] sm:text-[36px] sm:leading-[44px]"
+      <div className="sj-growth-reveal__sky" aria-hidden="true" />
+      <div className="sj-growth-reveal__glow" aria-hidden="true" />
+
+      <div className="sj-growth-reveal__stage">
+        <IllustratedSakura
+          snapshot={treeSnapshot}
+          growthDelta={delta}
+          revealPhase={revealPhase}
+          morphIntent={celebration.morphIntent}
+          reducedMotion={reducedMotion}
+          size="reveal"
+          className="sj-growth-reveal__tree"
+        />
+        {isLeap && revealPhase === "after" && !reducedMotion ? (
+          <div className="sj-growth-reveal__petals" aria-hidden="true">
+            {Array.from({ length: 12 }).map((_, index) => (
+              <span
+                key={index}
+                className="sj-growth-reveal__petal"
+                style={{
+                  ["--petal-i" as string]: String(index),
+                  animationDelay: `${0.08 * index}s`,
+                }}
+              />
+            ))}
+          </div>
+        ) : null}
+      </div>
+
+      <div
+        className="sj-growth-reveal__copy"
+        data-ready={copyReady || undefined}
       >
-        {copy.title}
-      </h1>
-      <p
-        id="growth-reveal-detail"
-        className="mt-4 max-w-[440px] font-[var(--font-ui)] text-[15px] leading-6 text-[var(--color-text-secondary)]"
-      >
-        {copy.detail}
-      </p>
-      <button
-        type="button"
-        className="mt-10 inline-flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-blossom-light)] px-6 font-[var(--font-ui)] text-[15px] font-medium leading-5 text-[var(--color-surface)] outline-none transition-[opacity,transform,box-shadow] duration-150 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px"
-        onClick={onReturn}
-      >
-        Return to garden
-        <ArrowRight aria-hidden size={18} />
-      </button>
+        <p className="sj-growth-reveal__eyebrow">
+          <Sparkle aria-hidden size={14} weight="fill" />
+          {celebration.kicker}
+        </p>
+        <h1 id="growth-reveal-title">{celebration.title}</h1>
+        <p id="growth-reveal-detail">{celebration.detail}</p>
+        {seedInsight ? (
+          <blockquote className="sj-growth-reveal__insight">
+            “{seedInsight}”
+          </blockquote>
+        ) : null}
+        <p className="sj-growth-reveal__meta sr-only">
+          {beforePresentation.stageLabel} became {afterPresentation.stageLabel}.
+          {presentSakura(treeSnapshot).memoryCount} memories held.
+        </p>
+        <button
+          type="button"
+          className="sj-growth-reveal__return"
+          onClick={onReturn}
+        >
+          {celebration.returnLabel}
+          <ArrowRight aria-hidden size={18} />
+        </button>
+      </div>
     </section>
   );
 }
+
+// re-export for timing-aware tests if needed
+export const growthRevealMorphMs = MORPH_MS;

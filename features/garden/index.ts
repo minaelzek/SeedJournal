@@ -17,4 +17,13 @@ export type {
   QualityTier,
   TreeTopology,
 } from "./types";
+/** Illustration-first sakura hero (product default). */
+export {
+  IllustratedSakura,
+  presentSakura,
+  morphIntentForReveal,
+  type IllustratedSakuraProps,
+  type SakuraPresentation,
+  type MorphIntent,
+} from "./illustration";
 

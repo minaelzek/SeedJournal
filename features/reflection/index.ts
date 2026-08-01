@@ -14,4 +14,5 @@ export type { SelectedFollowUp } from "./follow-up";
 export { growthForEntry, mapReflectionToGrowth } from "./growth";
 export type { GrowthResult } from "./growth";
 export { seededIndex, stableHash } from "./hash";
-
+export { weatherForEntry } from "./weather";
+export type { GardenWeather, GardenWeatherKind } from "./weather";

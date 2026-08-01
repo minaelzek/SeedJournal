@@ -28,6 +28,8 @@ function searchableText(entry: DecryptedJournalEntry): string {
       payload.prompt.renderedText,
       payload.followUp?.renderedText,
       payload.followUp?.response,
+      payload.secondFollowUp?.renderedText,
+      payload.secondFollowUp?.response,
       ...payload.tags,
       ...payload.threads,
     ]
@@ -111,4 +113,3 @@ export function entryExcerpt(body: string, maxGraphemes = 150): string {
     ? `${clean.slice(0, maxGraphemes).trimEnd()}…`
     : clean;
 }
-

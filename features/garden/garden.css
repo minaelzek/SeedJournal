@@ -7,22 +7,9 @@
   overflow: hidden;
   touch-action: pan-x pan-y;
   background:
-    radial-gradient(
-      ellipse 58% 17% at 50% 87%,
-      rgb(0 0 0 / 34%),
-      transparent 72%
-    ),
-    radial-gradient(
-      circle at 73% 24%,
-      color-mix(in srgb, var(--sj-color-moon) 5%, transparent),
-      transparent 23%
-    ),
-    linear-gradient(
-      168deg,
-      var(--sj-color-void) 0%,
-      color-mix(in srgb, var(--sj-color-indigo) 76%, var(--sj-color-void)) 58%,
-      var(--sj-color-void) 100%
-    );
+    radial-gradient(ellipse 46% 15% at 50% 87%, rgb(74 60 49 / 16%), transparent 72%),
+    radial-gradient(circle at 72% 20%, rgb(255 255 255 / 70%), transparent 24%),
+    linear-gradient(168deg, var(--sj-color-void) 0%, color-mix(in srgb, var(--sj-color-indigo) 76%, var(--sj-color-void)) 58%, var(--sj-color-void) 100%);
 }
 
 .sj-garden-scene canvas {
@@ -48,40 +35,49 @@
 .sj-garden-scene[data-tree-stage="seed"],
 .sj-garden-fallback[data-tree-stage="seed"] {
   background:
-    radial-gradient(
-      ellipse 20% 8% at 50% 68%,
-      rgb(0 0 0 / 46%),
-      transparent 72%
-    ),
-    radial-gradient(
-      circle at 62% 29%,
-      color-mix(in srgb, var(--sj-color-moon) 4%, transparent),
-      transparent 24%
-    ),
-    linear-gradient(
-      168deg,
-      var(--sj-color-void),
-      color-mix(in srgb, var(--sj-color-indigo) 63%, var(--sj-color-void))
-    );
+    radial-gradient(ellipse 20% 8% at 50% 68%, rgb(74 60 49 / 16%), transparent 72%),
+    radial-gradient(circle at 62% 29%, rgb(255 255 255 / 70%), transparent 24%),
+    linear-gradient(168deg, var(--sj-color-void), color-mix(in srgb, var(--sj-color-indigo) 63%, var(--sj-color-void)));
 }
 
 .sj-memory-explore {
-  min-height: 2.75rem;
+  min-height: 2.5rem;
   display: inline-flex;
   align-items: center;
-  gap: var(--sj-space-2, 0.5rem);
-  padding: 0 var(--sj-space-3, 0.75rem);
-  border: 1px solid var(--sj-color-border);
-  border-radius: var(--sj-radius-control, 0.875rem);
+  gap: 0.35rem;
+  padding: 0 0.55rem 0 0.65rem;
+  border: 1px solid color-mix(in srgb, var(--sj-color-border) 80%, transparent);
+  border-radius: 999px;
   color: var(--sj-color-text-muted);
-  background: color-mix(in srgb, var(--sj-color-surface) 72%, transparent);
-  backdrop-filter: blur(1rem);
+  background: color-mix(in srgb, var(--sj-color-surface) 62%, transparent);
+  backdrop-filter: blur(0.85rem);
   font: inherit;
+  font-size: 0.72rem;
   cursor: pointer;
+  opacity: 0.88;
   transition:
     color var(--sj-motion-hover, 160ms) ease,
     border-color var(--sj-motion-hover, 160ms) ease,
-    background-color var(--sj-motion-hover, 160ms) ease;
+    background-color var(--sj-motion-hover, 160ms) ease,
+    opacity var(--sj-motion-hover, 160ms) ease;
+}
+
+/* Home: de-emphasize vs primary care path — count badge only. */
+.sj-home__memory-control .sj-memory-explore > span:not(.sj-memory-explore__count) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.sj-home__memory-control .sj-memory-explore {
+  min-width: 2.5rem;
+  min-height: 2.5rem;
+  justify-content: center;
+  padding: 0 0.45rem;
+  gap: 0.2rem;
 }
 
 .sj-memory-explore:hover {

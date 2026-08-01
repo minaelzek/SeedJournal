@@ -1,35 +1,35 @@
 @import "tailwindcss";
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 
   /* Primitive palette */
-  --primitive-void: #080a0f;
-  --primitive-indigo: #11151c;
-  --primitive-wash: #1b2230;
-  --primitive-moon: #d9e1e8;
-  --primitive-moon-muted: #9da8b4;
-  --primitive-trunk: #251719;
-  --primitive-trunk-highlight: #6a3e3e;
-  --primitive-bark-lenticel: #a67870;
-  --primitive-soil: #181417;
-  --primitive-blossom: #f1d9dc;
-  --primitive-blossom-light: #fff3f1;
-  --primitive-blossom-shadow: #c68e98;
-  --primitive-leaf: #718378;
-  --primitive-leaf-bronze: #8e7062;
+  --primitive-void: #f5f3ed;
+  --primitive-indigo: #e8e9e1;
+  --primitive-wash: #dfe6dc;
+  --primitive-moon: #26332d;
+  --primitive-moon-muted: #66716a;
+  --primitive-trunk: #665044;
+  --primitive-trunk-highlight: #a17c5e;
+  --primitive-bark-lenticel: #b79878;
+  --primitive-soil: #d5c7b4;
+  --primitive-blossom: #c78179;
+  --primitive-blossom-light: #fffdfa;
+  --primitive-blossom-shadow: #a75d58;
+  --primitive-leaf: #78917d;
+  --primitive-leaf-bronze: #9a8662;
   --primitive-destructive: #f19aa5;
 
   /* Semantic tokens */
   --color-background: var(--primitive-void);
   --color-background-elevated: var(--primitive-indigo);
-  --color-surface: rgb(15 18 34 / 94%);
-  --color-surface-raised: rgb(26 33 64 / 96%);
-  --color-text-primary: #f7f2f5;
-  --color-text-secondary: #bcc1d0;
-  --color-border: rgb(221 229 247 / 16%);
-  --color-border-strong: rgb(221 229 247 / 28%);
-  --color-focus: #ffd6e6;
+  --color-surface: rgb(255 253 249 / 92%);
+  --color-surface-raised: #eeece4;
+  --color-text-primary: #26332d;
+  --color-text-secondary: #66716a;
+  --color-border: rgb(38 51 45 / 14%);
+  --color-border-strong: rgb(38 51 45 / 24%);
+  --color-focus: #a75d58;
   --color-blossom: var(--primitive-blossom);
   --color-blossom-light: var(--primitive-blossom-light);
   --color-leaf: var(--primitive-leaf);
@@ -67,15 +67,28 @@
   --sj-color-wash: var(--primitive-wash);
   --sj-color-moon: var(--primitive-moon);
   --sj-color-moon-muted: var(--primitive-moon-muted);
-  --sj-color-trunk: var(--primitive-trunk);
-  --sj-color-trunk-highlight: var(--primitive-trunk-highlight);
-  --sj-color-bark-lenticel: var(--primitive-bark-lenticel);
+  --sj-color-trunk: #6a5a4e;
+  --sj-color-trunk-highlight: #8f7a68;
+  /* Greyer sakura bark — less chocolate, more cherry-tree. */
+  --sj-color-bark: #7a6a5c;
+  --sj-color-bark-lenticel: #9a8878;
   --sj-color-soil: var(--primitive-soil);
-  --sj-color-blossom: var(--primitive-blossom);
-  --sj-color-blossom-light: var(--primitive-blossom-light);
-  --sj-color-blossom-shadow: var(--primitive-blossom-shadow);
-  --sj-color-leaf: var(--primitive-leaf);
+  --sj-color-blossom: #e8a4b4;
+  --sj-color-blossom-light: #f7d4de;
+  --sj-color-blossom-shadow: #c4788a;
+  --sj-color-leaf: #8fa892;
+  --sj-color-leaf-selected: #a8c0ad;
   --sj-color-leaf-bronze: var(--primitive-leaf-bronze);
+  --sj-color-bud: #d492a3;
+  --sj-color-blossom-selected: #fff8f4;
+  --sj-color-stamen: #c6a96f;
+  --sj-color-seed: #5b3d2d;
+  --sj-color-seed-highlight: #a47b5d;
+  --sj-color-seed-crease: #35261f;
+  --sj-color-radicle: #a99478;
+  --sj-color-garden-ground: #c9bca9;
+  --sj-color-soil-rim: #9e8973;
+  --sj-color-material-neutral: #fffdfa;
   --sj-color-text: var(--color-text-primary);
   --sj-color-text-muted: var(--color-text-secondary);
   --sj-color-surface: var(--color-surface);
@@ -95,8 +108,12 @@
   --sj-radius-control: var(--radius-control);
   --sj-radius-surface: var(--radius-surface);
   --sj-motion-fast: var(--motion-interface);
+  --sj-motion-hover: var(--motion-interface);
+  --sj-motion-press: var(--motion-press);
+  --sj-motion-dialog: var(--motion-surface);
   --sj-motion-surface: var(--motion-surface);
   --sj-ease-enter: var(--ease-enter);
+  --sj-ease-exit: var(--ease-exit);
 }
 
 @theme inline {

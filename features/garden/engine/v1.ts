@@ -10,6 +10,7 @@ import type {
   TreeTopology,
   Vec3Tuple,
 } from "../types";
+import { ambientOrganKind } from "../art/sakuraOrganPolicy";
 import { finalizeTopology } from "./buffers";
 import {
   add,
@@ -238,6 +239,8 @@ function createAmbientFoliage(
     const branch = branches[1 + Math.floor(random() * (branches.length - 1))];
     const position = sampleCubic(branch, 0.38 + random() * 0.61);
     const angle = random() * TAU;
+    // Mature ambient dressing for v1 full rebuild — sakura-forward mix.
+    const kind = ambientOrganKind("mature", random());
     return legacyOrgan(
       {
         id: `ambient-${index}`,
@@ -247,8 +250,13 @@ function createAmbientFoliage(
           Math.sin(angle) * (0.16 + random() * 0.42),
         ]),
         rotation: [random() * 0.75, angle, (random() - 0.5) * 0.8],
-        scale: 0.62 + random() * 0.42,
-        kind: random() > 0.6 ? "blossom" : "leaf",
+        scale:
+          kind === "leaf"
+            ? 0.52 + random() * 0.28
+            : kind === "bud"
+              ? 0.7 + random() * 0.22
+              : 0.78 + random() * 0.32,
+        kind,
         entryId: null,
         sequence: 0,
       },

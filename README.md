@@ -9,7 +9,7 @@ before they are stored in Cloudflare D1.
 - ChatGPT sign-in with account-scoped records
 - PBKDF2 and AES-GCM encrypted journal vault
 - Deterministic, local reflection prompts with no paid AI dependency
-- Procedural Three.js sakura whose growth is tied to completed reflections
+- Illustrated 2.5D sakura hero (blossom-first) whose growth is tied to completed reflections; deep insight triggers hanami leaps
 - Encrypted autosave, local search, export, revisit, and deletion flows
 - Responsive, reduced-motion, keyboard, touch, and screen-reader support
 

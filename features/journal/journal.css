@@ -1,0 +1,722 @@
+.sj-ritual {
+  position: relative;
+  min-height: 100dvh;
+  width: 100%;
+  overflow-x: hidden;
+  color: var(--color-text-primary);
+  background:
+    radial-gradient(circle at 50% -8%, rgb(255 255 255 / 88%), transparent 38rem),
+    color-mix(in srgb, var(--color-surface) 94%, transparent);
+  backdrop-filter: blur(1.25rem) saturate(0.86);
+}
+
+.sj-ritual::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.24;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.13'/%3E%3C/svg%3E");
+  mix-blend-mode: soft-light;
+}
+
+.sj-ritual__shell {
+  position: relative;
+  z-index: 1;
+  width: min(100%, 48rem);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  margin: 0 auto;
+  padding:
+    max(1rem, env(safe-area-inset-top))
+    clamp(1.25rem, 4vw, 2.5rem)
+    max(1.5rem, env(safe-area-inset-bottom));
+}
+
+.sj-ritual__header {
+  position: relative;
+  z-index: 5;
+  min-height: 3rem;
+  display: grid;
+  grid-template-columns: 3rem 1fr minmax(3rem, auto);
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.sj-ritual__close {
+  width: 3rem;
+  height: 3rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--color-text-secondary);
+  background: transparent;
+  cursor: pointer;
+  transition:
+    color var(--motion-interface) ease,
+    background-color var(--motion-interface) ease;
+}
+
+.sj-ritual__close:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-text-primary) 6%, transparent);
+}
+
+.sj-ritual-progress {
+  min-width: 7.25rem;
+  display: grid;
+  justify-items: center;
+  gap: 0.38rem;
+}
+
+.sj-ritual-progress__label {
+  color: var(--color-text-secondary);
+  font-size: 0.69rem;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sj-ritual-progress__dots {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sj-ritual-progress__dots i {
+  width: 1.25rem;
+  height: 0.2rem;
+  display: block;
+  overflow: hidden;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--sj-color-text) 11%, transparent);
+  transition: background-color var(--sj-motion-hover, 160ms) ease,
+    width var(--sj-motion-hover, 160ms) ease;
+}
+
+.sj-ritual-progress__dots i[data-state="done"] {
+  background: color-mix(in srgb, var(--sj-color-leaf) 72%, var(--sj-color-text));
+}
+
+.sj-ritual-progress__dots i[data-state="active"] {
+  width: 1.55rem;
+  background: var(--sj-color-leaf);
+  box-shadow: 0 0 0.55rem color-mix(in srgb, var(--sj-color-leaf) 28%, transparent);
+}
+
+.sj-ritual-save {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  padding-inline: 0.25rem;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.sj-ritual__content {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  padding-block: clamp(2.5rem, 8vh, 6rem);
+}
+
+.sj-ritual-step {
+  width: 100%;
+  animation: sj-ritual-enter 420ms var(--ease-enter) both;
+}
+
+.sj-ritual-step h1,
+.sj-ritual-prompt {
+  max-width: 42rem;
+  margin: 0;
+  color: var(--color-text-primary);
+  font-family: var(--font-poetic);
+  font-size: clamp(2rem, 5vw, 3.4rem);
+  font-weight: 420;
+  letter-spacing: -0.045em;
+  line-height: 1.08;
+  text-wrap: balance;
+}
+
+.sj-ritual-step__intro {
+  margin-bottom: clamp(2rem, 5vh, 3.25rem);
+}
+
+.sj-ritual-kicker,
+.sj-ritual-field-label {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  font-weight: 650;
+  line-height: 1.4;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.sj-ritual-kicker {
+  margin-bottom: 1rem;
+}
+
+.sj-ritual-field-label {
+  margin-bottom: 0.85rem;
+}
+
+.sj-ritual-reassurance {
+  max-width: 34rem;
+  margin: 1.25rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.94rem;
+  line-height: 1.65;
+}
+
+.sj-returning-insight {
+  max-width: 31rem;
+  margin: 1.5rem 0 0;
+  padding-left: 1rem;
+  border-left: 1px solid color-mix(in srgb, var(--color-blossom-shadow) 44%, var(--color-border));
+  color: color-mix(in srgb, var(--color-text-primary) 82%, var(--color-text-secondary));
+  font-family: var(--font-poetic);
+  font-size: 1rem;
+  font-style: normal;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.sj-ritual-directions {
+  width: 100%;
+}
+
+.sj-ritual-directions summary {
+  width: fit-content;
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0 0.8rem;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 580;
+  cursor: pointer;
+  list-style: none;
+}
+
+.sj-ritual-directions summary::-webkit-details-marker {
+  display: none;
+}
+
+.sj-ritual-directions summary::after {
+  content: "+";
+  width: 1.15rem;
+  height: 1.15rem;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  font-size: 0.8rem;
+  line-height: 1;
+  transition: transform var(--motion-interface) var(--ease-enter);
+}
+
+.sj-ritual-directions[open] summary::after {
+  transform: rotate(45deg);
+}
+
+.sj-ritual-directions summary:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+}
+
+.sj-ritual-paths {
+  display: flex;
+  gap: 0.5rem;
+  margin-inline: -0.25rem;
+  padding: 0.25rem 0.25rem 0.75rem;
+  overflow-x: auto;
+  scrollbar-width: none;
+  scroll-snap-type: x proximity;
+}
+
+.sj-ritual-directions .sj-ritual-paths {
+  margin-top: 0.55rem;
+}
+
+.sj-ritual-paths::-webkit-scrollbar {
+  display: none;
+}
+
+.sj-ritual-path {
+  min-height: 2.75rem;
+  flex: 0 0 auto;
+  padding: 0 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: rgb(255 255 255 / 24%);
+  font-size: 0.84rem;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition:
+    color var(--motion-interface) ease,
+    border-color var(--motion-interface) ease,
+    background-color var(--motion-interface) ease,
+    box-shadow var(--motion-interface) ease;
+}
+
+.sj-ritual-path[aria-checked="true"] {
+  color: var(--color-text-primary);
+  border-color: color-mix(in srgb, var(--color-blossom) 68%, var(--color-border));
+  background: color-mix(in srgb, var(--color-blossom) 9%, white);
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 55%);
+}
+
+.sj-ritual-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: clamp(2rem, 6vh, 3.5rem);
+}
+
+.sj-ritual-button {
+  min-height: 3.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.65rem;
+  padding: 0 1.3rem;
+  border-radius: 999px;
+  font-size: 0.92rem;
+  font-weight: 620;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    color var(--motion-interface) ease,
+    opacity var(--motion-interface) ease,
+    background-color var(--motion-interface) ease,
+    border-color var(--motion-interface) ease,
+    box-shadow var(--motion-interface) ease,
+    transform var(--motion-press) ease;
+}
+
+.sj-ritual-button--primary {
+  min-width: 10.5rem;
+  border: 1px solid var(--color-text-primary);
+  color: var(--primitive-blossom-light);
+  background: var(--color-text-primary);
+  box-shadow:
+    0 0.75rem 2.25rem rgb(38 51 45 / 14%),
+    inset 0 1px 0 rgb(255 255 255 / 14%);
+}
+
+.sj-ritual-button--primary:hover {
+  background: color-mix(in srgb, var(--color-text-primary) 86%, var(--color-leaf));
+  box-shadow:
+    0 1rem 2.6rem rgb(38 51 45 / 18%),
+    inset 0 1px 0 rgb(255 255 255 / 16%);
+}
+
+.sj-ritual-button--secondary {
+  min-height: 3rem;
+  border: 1px solid transparent;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-weight: 520;
+}
+
+.sj-ritual-button--secondary:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+}
+
+.sj-ritual-button:active {
+  transform: translateY(1px);
+}
+
+.sj-ritual-button:disabled {
+  opacity: 0.34;
+  cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
+}
+
+.sj-ritual-prompt {
+  margin-bottom: clamp(1.5rem, 4vh, 2.5rem);
+  font-size: clamp(1.55rem, 4vw, 2.35rem);
+  line-height: 1.16;
+}
+
+.sj-writing-canvas {
+  position: relative;
+  padding: clamp(1.25rem, 4vw, 2rem);
+  border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
+  border-radius: clamp(1.25rem, 4vw, 1.75rem);
+  background:
+    linear-gradient(rgb(255 255 255 / 42%), rgb(255 255 255 / 24%)),
+    var(--color-surface);
+  box-shadow:
+    0 1.5rem 4rem rgb(74 60 49 / 6%),
+    inset 0 1px 0 rgb(255 255 255 / 70%);
+  transition:
+    border-color var(--motion-interface) ease,
+    box-shadow var(--motion-interface) ease;
+}
+
+.sj-writing-canvas:focus-within {
+  border-color: color-mix(in srgb, var(--color-focus) 34%, var(--color-border));
+  box-shadow:
+    0 1.5rem 4rem rgb(74 60 49 / 7%),
+    0 0 0 0.22rem color-mix(in srgb, var(--color-focus) 5%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 74%);
+}
+
+.sj-writing-canvas textarea {
+  min-height: clamp(15rem, 40vh, 24rem);
+  font-size: clamp(1.08rem, 2.2vw, 1.28rem);
+  line-height: 1.68;
+}
+
+.sj-writing-canvas textarea:focus,
+.sj-writing-canvas textarea:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.sj-writing-canvas__footer {
+  min-height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 1rem;
+  color: var(--color-text-secondary);
+  font-size: 0.72rem;
+  line-height: 1.4;
+}
+
+.sj-writing-canvas__footer span:last-child {
+  flex: 0 0 auto;
+}
+
+.sj-ritual-threads {
+  margin-top: 1.5rem;
+}
+
+.sj-ritual-thread-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.sj-ritual-thread {
+  min-height: 2.5rem;
+  padding: 0 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: 0.76rem;
+  cursor: pointer;
+}
+
+.sj-ritual-thread[aria-pressed="true"] {
+  color: var(--color-text-primary);
+  border-color: color-mix(in srgb, var(--color-leaf) 66%, var(--color-border));
+  background: color-mix(in srgb, var(--color-leaf) 8%, transparent);
+}
+
+.sj-ritual-hint,
+.sj-ritual-error {
+  max-width: 36rem;
+  margin: 1rem 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  line-height: 1.55;
+}
+
+.sj-ritual-back {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 0 2rem -0.5rem;
+  padding: 0 0.6rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.sj-ritual-back:hover {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
+}
+
+.sj-ritual-textarea {
+  width: 100%;
+  min-height: 12rem;
+  margin-top: 2rem;
+  resize: none;
+  padding: clamp(1.25rem, 4vw, 1.75rem);
+  border: 1px solid var(--color-border);
+  border-radius: 1.5rem;
+  color: var(--color-text-primary);
+  background: rgb(255 255 255 / 38%);
+  font-family: var(--font-poetic);
+  font-size: 1.12rem;
+  line-height: 1.7;
+  caret-color: var(--color-blossom-shadow);
+  outline: none;
+  transition:
+    border-color var(--motion-interface) ease,
+    background-color var(--motion-interface) ease,
+    box-shadow var(--motion-interface) ease;
+}
+
+.sj-ritual-textarea:focus {
+  border-color: color-mix(in srgb, var(--color-focus) 62%, transparent);
+  background: rgb(255 255 255 / 62%);
+  box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--color-focus) 8%, transparent);
+}
+
+.sj-ritual-textarea::placeholder {
+  color: color-mix(in srgb, var(--color-text-secondary) 58%, transparent);
+}
+
+.sj-ritual-textarea--insight {
+  min-height: 8.5rem;
+}
+
+.sj-return-bud-choice {
+  width: 100%;
+  min-height: 4.75rem;
+  display: grid;
+  grid-template-columns: 1.5rem 1fr 1.15rem;
+  align-items: center;
+  gap: 0.85rem;
+  margin-top: 0.9rem;
+  padding: 0.8rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, transparent);
+  border-radius: 1.25rem;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-surface) 62%, transparent);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    color var(--motion-interface) ease,
+    border-color var(--motion-interface) ease,
+    background-color var(--motion-interface) ease,
+    box-shadow var(--motion-interface) ease;
+}
+
+.sj-return-bud-choice > svg {
+  color: var(--color-leaf);
+}
+
+.sj-return-bud-choice > span {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.sj-return-bud-choice strong {
+  color: inherit;
+  font-size: 0.86rem;
+  font-weight: 620;
+  line-height: 1.3;
+}
+
+.sj-return-bud-choice small {
+  color: var(--color-text-secondary);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.sj-return-bud-choice > i {
+  position: relative;
+  width: 1.05rem;
+  height: 1.05rem;
+  border: 1px solid color-mix(in srgb, var(--color-leaf) 48%, var(--color-border));
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--color-surface) 82%, transparent);
+}
+
+.sj-return-bud-choice[data-selected] {
+  border-color: color-mix(in srgb, var(--color-leaf) 44%, var(--color-border));
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-leaf) 7%, var(--color-surface));
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 54%);
+}
+
+.sj-return-bud-choice[data-selected] > i::after {
+  content: "";
+  position: absolute;
+  inset: 0.2rem;
+  border-radius: 50%;
+  background: var(--color-leaf);
+}
+
+.sj-return-bud-choice:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-leaf) 52%, var(--color-border));
+  background: color-mix(in srgb, var(--color-leaf) 6%, white);
+}
+
+.sj-return-bud-choice:focus-visible {
+  outline: 2px solid var(--color-focus);
+  outline-offset: 3px;
+}
+
+.sj-return-bud-choice:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sj-ritual-step--nurtured {
+  max-width: 34rem;
+  margin-inline: auto;
+  text-align: center;
+}
+
+.sj-ritual-grown-mark {
+  width: 4.25rem;
+  height: 4.25rem;
+  display: grid;
+  place-items: center;
+  margin: 0 auto 1.5rem;
+  border: 1px solid color-mix(in srgb, var(--sj-color-leaf) 38%, transparent);
+  border-radius: 50%;
+  color: var(--sj-color-leaf);
+  background:
+    radial-gradient(circle at 35% 28%, rgb(255 255 255 / 70%), transparent 48%),
+    color-mix(in srgb, var(--sj-color-leaf) 10%, white);
+  box-shadow:
+    0 0 0 0.8rem color-mix(in srgb, var(--sj-color-leaf) 5%, transparent),
+    0 0.75rem 2rem color-mix(in srgb, var(--sj-color-void) 8%, transparent);
+}
+
+.sj-ritual-step--nurtured .sj-ritual-kicker {
+  margin-bottom: 0.85rem;
+}
+
+.sj-ritual-step--nurtured .sj-ritual-reassurance {
+  margin-inline: auto;
+}
+
+.sj-ritual-step--nurtured .sj-ritual-button {
+  margin-top: 2.35rem;
+}
+
+@keyframes sj-ritual-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.65rem);
+  }
+}
+
+@media (max-width: 40rem) {
+  .sj-ritual {
+    background:
+      radial-gradient(circle at 50% -4%, rgb(255 255 255 / 82%), transparent 25rem),
+      color-mix(in srgb, var(--color-surface) 97%, transparent);
+  }
+
+  .sj-ritual__shell {
+    padding-inline:
+      max(1.25rem, env(safe-area-inset-left))
+      max(1.25rem, env(safe-area-inset-right));
+  }
+
+  .sj-ritual__header {
+    position: sticky;
+    top: max(0.5rem, env(safe-area-inset-top));
+  }
+
+  .sj-ritual__content {
+    align-items: flex-start;
+    padding-block: clamp(2rem, 6vh, 3.75rem) 7.75rem;
+  }
+
+  .sj-ritual-step h1 {
+    font-size: clamp(2rem, 9.6vw, 2.75rem);
+    letter-spacing: -0.05em;
+  }
+
+  .sj-ritual-step__intro {
+    margin-bottom: 2rem;
+  }
+
+  .sj-ritual-reassurance {
+    font-size: 0.88rem;
+  }
+
+  .sj-ritual-actions {
+    position: sticky;
+    z-index: 4;
+    bottom: calc(0.75rem + env(safe-area-inset-bottom));
+    display: grid;
+    grid-template-columns: 1fr;
+    margin-top: 2rem;
+    padding: 0.55rem;
+    border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
+    border-radius: 1.5rem;
+    background: color-mix(in srgb, var(--color-surface) 89%, transparent);
+    box-shadow: 0 0.75rem 2.75rem rgb(74 60 49 / 14%);
+    backdrop-filter: blur(1.25rem) saturate(1.1);
+  }
+
+  .sj-ritual-button {
+    width: 100%;
+  }
+
+  .sj-ritual-button--secondary {
+    min-height: 2.75rem;
+  }
+
+  .sj-ritual-prompt {
+    font-size: clamp(1.45rem, 6.5vw, 1.9rem);
+  }
+
+  .sj-writing-canvas {
+    margin-inline: -0.35rem;
+    padding: 1.25rem;
+  }
+
+  .sj-writing-canvas textarea {
+    min-height: 17rem;
+  }
+
+  .sj-writing-canvas__footer {
+    align-items: flex-end;
+  }
+
+  .sj-ritual-textarea {
+    min-height: 14rem;
+  }
+}
+
+@media (max-width: 23rem) {
+  .sj-ritual__header {
+    grid-template-columns: 2.75rem 1fr 2.75rem;
+  }
+
+  .sj-ritual-save {
+    width: 2.75rem;
+    overflow: hidden;
+    color: transparent;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sj-ritual-step {
+    animation: none;
+  }
+}

@@ -13,6 +13,7 @@ import type {
   TreeRenderPackageV2,
   Vec3Tuple,
 } from "../types";
+import { ambientOrganKind } from "../art/sakuraOrganPolicy";
 import { finalizeTopology } from "./buffers";
 import {
   add,
@@ -22,6 +23,7 @@ import {
   lerpVector,
   multiply,
   normalize,
+  sampleCubic,
   seededRandom,
   subtract,
   TAU,
@@ -511,37 +513,36 @@ function addAmbientOrgans(
   const random = seededRandom(
     `v2:organs:${state.rootSeed}:${event.seed}:${event.sequence}:${unitOrdinal}`,
   );
+  // Fuller crown than leaf-era, within mature organ budget (~700 ambient+memory).
   const count =
     stage === "sprout"
       ? state.totalGrowthUnits === 0
         ? 3
-        : 1
+        : 2
       : stage === "sapling"
-        ? 2
+        ? 3
         : stage === "young-tree"
-          ? 3
-          : 4;
+          ? 4
+          : stage === "established"
+            ? 4
+            : 5;
   for (let index = 0; index < count; index += 1) {
     const branch = branches[index % branches.length];
     const angle = random() * TAU;
-    const stageKind: BotanicalOrganKind =
-      stage === "established" || stage === "mature"
-        ? random() > 0.38
-          ? "blossom"
-          : random() > 0.42
-            ? "bud"
-            : "leaf"
-        : stage === "young-tree" && random() > 0.84
-          ? "bud"
-          : "leaf";
+    // Species identity: sakura-forward ambient mix (not leaf-default).
+    const stageKind: BotanicalOrganKind = ambientOrganKind(stage, random());
+    // Place along the outer half of the branch for fuller crown volume.
+    const axis = 0.52 + random() * 0.46;
+    const [px, py, pz] = sampleCubic(branch, axis);
+    const lateral = 0.04 + random() * (stageKind === "leaf" ? 0.07 : 0.11);
     state.foliage.push({
       id: `v2-organ-${event.sequence}-${unitOrdinal}-${index}`,
       parentBranchId: branch.id,
-      position: add(branch.end, [
-        Math.cos(angle) * (0.045 + random() * 0.09),
-        (random() - 0.22) * 0.11,
-        Math.sin(angle) * (0.04 + random() * 0.08),
-      ]),
+      position: [
+        px + Math.cos(angle) * lateral,
+        py + (random() - 0.28) * 0.1,
+        pz + Math.sin(angle) * lateral,
+      ],
       rotation: [
         -0.25 + random() * 0.68,
         angle,
@@ -549,8 +550,10 @@ function addAmbientOrgans(
       ],
       scale:
         stageKind === "leaf"
-          ? 0.52 + random() * 0.24
-          : 0.66 + random() * 0.2,
+          ? 0.48 + random() * 0.2
+          : stageKind === "bud"
+            ? 0.62 + random() * 0.18
+            : 0.72 + random() * 0.22,
       kind: stageKind,
       entryId: null,
       memoryRenderId: 0,

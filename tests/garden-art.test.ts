@@ -53,7 +53,7 @@ describe("botanical art geometry", () => {
     ).toBeGreaterThan(0.65);
   });
 
-  it("keeps botanical pigments legible against the pre-dawn field", () => {
+  it("keeps sakura pigments legible on the light garden field", () => {
     const luminance = (hex: string) => {
       const channels = hex
         .slice(1)
@@ -66,15 +66,21 @@ describe("botanical art geometry", () => {
       );
     };
     const background = luminance(TREE_MATERIAL_FALLBACKS.void);
-    expect(luminance(TREE_MATERIAL_FALLBACKS.bark) - background).toBeGreaterThan(
-      0.2,
+    // Bark is darker grey-brown against the light field.
+    expect(background - luminance(TREE_MATERIAL_FALLBACKS.bark)).toBeGreaterThan(
+      0.25,
     );
-    expect(luminance(TREE_MATERIAL_FALLBACKS.leaf) - background).toBeGreaterThan(
-      0.35,
-    );
+    // Blossom light stays high-key pink (sakura mark).
+    expect(luminance(TREE_MATERIAL_FALLBACKS.blossomLight)).toBeGreaterThan(0.7);
+    // Blossoms read brighter / pinker than bark.
     expect(
-      luminance(TREE_MATERIAL_FALLBACKS.blossomLight) - background,
-    ).toBeGreaterThan(0.75);
+      luminance(TREE_MATERIAL_FALLBACKS.blossomLight) -
+        luminance(TREE_MATERIAL_FALLBACKS.bark),
+    ).toBeGreaterThan(0.25);
+    // Leaf is secondary — not the hero chroma.
+    expect(luminance(TREE_MATERIAL_FALLBACKS.leaf)).toBeLessThan(
+      luminance(TREE_MATERIAL_FALLBACKS.blossomLight),
+    );
   });
 
   it("preserves camera scale and focus through the first nurture", () => {

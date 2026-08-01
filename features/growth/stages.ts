@@ -80,33 +80,33 @@ export function stageGrowthMessage(stage: TreeStage): {
   switch (stage) {
     case "seed":
       return {
-        title: "A beginning rests in the garden.",
-        detail: "Your reflection is safely held.",
+        title: "A cherry stone rests in the garden.",
+        detail: "Your reflection is safely held beneath the soil.",
       };
     case "sprout":
       return {
-        title: "The first shoot has emerged.",
-        detail: "Your reflection has become part of its beginning.",
+        title: "Your sakura has sprouted.",
+        detail: "The first green of care is already on the stem.",
       };
     case "sapling":
       return {
-        title: "The young tree has found a new line.",
-        detail: "Your reflection now lives within its growing form.",
+        title: "A young sakura is taking shape.",
+        detail: "Pink is beginning to gather where you paid attention.",
       };
     case "young-tree":
       return {
-        title: "The crown has opened a little further.",
+        title: "The sakura crown is opening.",
         detail: "Your reflection has taken its place in the living tree.",
       };
     case "established":
       return {
-        title: "New life has settled into the canopy.",
-        detail: "Your reflection has taken its place in the living tree.",
+        title: "Blossoms have settled into the canopy.",
+        detail: "Your reflection has deepened the living tree.",
       };
     case "mature":
       return {
-        title: "The outer branches are still becoming.",
-        detail: "Your reflection has taken its place in the living tree.",
+        title: "A full sakura stands in bloom.",
+        detail: "Your reflection has taken its place among the blossoms.",
       };
   }
 }

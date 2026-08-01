@@ -54,6 +54,14 @@ export function buildReadableMarkdown(
         payload.followUp.response,
       );
     }
+    if (payload.secondFollowUp && !payload.secondFollowUp.skipped) {
+      lines.push(
+        "",
+        `## ${payload.secondFollowUp.renderedText}`,
+        "",
+        payload.secondFollowUp.response,
+      );
+    }
     if (payload.seedInsight.trim()) {
       lines.push("", "## What I want to carry", "", payload.seedInsight);
     }

@@ -5,12 +5,16 @@ import type { TreeGrowthDelta, TreeGrowthEvent } from "../lib/contracts";
 import {
   GrowthReveal,
   describeTreeStage,
+  growthCelebration,
+  growthFormFromKind,
+  growthFormLabel,
   growthRevealKey,
   hasPresentedGrowthReveal,
   isExactGrowthDelta,
   markGrowthRevealPresented,
   memoryLineageAnchor,
   resolveMemoryLineage,
+  selectEarnedGrowthEvent,
   stageForGrowthUnits,
   stageGrowthMessage,
   type GrowthRevealStorage,
@@ -114,7 +118,7 @@ describe("seed-to-sakura growth experience", () => {
     expect(growthRevealKey("tree-a", committed)).toContain(":20:22");
   });
 
-  it("renders neutral completion language and one return action", () => {
+  it("renders neutral completion language and one return-to-tree action", () => {
     const markup = renderToStaticMarkup(
       <GrowthReveal
         delta={delta(40)}
@@ -124,11 +128,65 @@ describe("seed-to-sakura growth experience", () => {
         onReturn={() => undefined}
       />,
     );
-    expect(markup).toContain("Return to garden");
-    expect(markup).toContain("living tree");
+    expect(markup).toContain("Return to your sakura");
+    expect(markup).toContain("sj-growth-reveal");
+    expect(markup).toContain("sj-illustrated-sakura");
+    expect(markup).toContain("sj-growth-reveal__copy");
     expect(markup).not.toMatch(
       /\b(score|scored|depth|signal|rubric|quality|grade|unit|points?|luminous)\b/i,
     );
+  });
+
+  it("names the earned memory form even when structural growth follows it", () => {
+    const memory = event(51);
+    const branch: TreeGrowthEvent = {
+      ...event(52),
+      id: "branch-52",
+      entryId: null,
+      kind: "branch",
+      growthUnits: 0,
+    };
+    const committed = {
+      previousSequence: 50,
+      nextSequence: 52,
+      events: [memory, branch],
+    } as const;
+    // Explicit micro intent isolates form labeling from hanami leap copy.
+    const celebration = growthCelebration(committed, "young-tree", "micro");
+    expect(selectEarnedGrowthEvent(committed)?.kind).toBe("memory_blossom");
+    expect(celebration.form).toBe("blossom");
+    expect(celebration.formLabel).toBe("A sakura blossom opened");
+    expect(celebration.detail).toMatch(/new branch/i);
+    expect(celebration.returnLabel).toBe("Return to your sakura");
+
+    const markup = renderToStaticMarkup(
+      <GrowthReveal
+        delta={committed}
+        stage="young-tree"
+        reducedMotion
+        treeId="branch-after-memory-tree"
+        onReturn={() => undefined}
+      />,
+    );
+
+    expect(markup).toContain("A sakura blossom opened");
+    expect(markup).toContain("Return to your sakura");
+    expect(markup).not.toContain("A new leaf unfurled");
+  });
+
+  it("maps growth kinds to botanical form labels without score language", () => {
+    expect(growthFormFromKind("memory_leaf")).toBe("leaf");
+    expect(growthFormFromKind("memory_bud")).toBe("bud");
+    expect(growthFormFromKind("memory_blossom")).toBe("blossom");
+    expect(growthFormFromKind("memory_luminous_blossom")).toBe("luminous");
+    expect(growthFormLabel("bud")).toBe("A new sakura bud formed");
+    expect(growthFormLabel("luminous")).toBe("A radiant sakura blossom opened");
+
+    const celebration = growthCelebration(delta(8), "sapling", "micro");
+    expect(celebration.title).toBe(stageGrowthMessage("sapling").title);
+    expect(
+      `${celebration.formLabel} ${celebration.title} ${celebration.detail}`,
+    ).not.toMatch(/\b(xp|points?|score|leaderboard|gems?)\b/i);
   });
 
   it("keeps revisits beside a valid parent and rejects broken lineage", () => {

@@ -50,8 +50,11 @@ export type JournalRitualStage =
   | "new"
   | "writing"
   | "reflection-offered"
+  | "second-reflection-offered"
   | "follow-up-answered"
   | "follow-up-skipped"
+  | "second-reflection-answered"
+  | "second-reflection-skipped"
   | "seed-insight-added"
   | "seed-insight-skipped"
   | "nurtured";
@@ -77,7 +80,19 @@ export interface JournalEntryPayloadV1 {
     response: string;
     skipped: boolean;
   };
+  secondFollowUp?: {
+    id: string;
+    target: ReflectionSignal | "deepen" | "language-neutral";
+    renderedText: string;
+    response: string;
+    skipped: boolean;
+  };
   seedInsight: string;
+  returnBud?: {
+    dueLocalDay: string;
+    state: "waiting" | "opened" | "released";
+    resolvedAt?: number;
+  };
   ritual: {
     conciseBodyOverride: boolean;
     conciseFollowUpOverride: boolean;

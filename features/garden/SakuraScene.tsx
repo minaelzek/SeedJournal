@@ -2,7 +2,8 @@
 
 import { Canvas } from "@react-three/fiber";
 import { useState } from "react";
-import type { TreeSnapshot } from "@/lib/contracts";
+import type { GardenWeatherKind } from "@/features/reflection";
+import type { TreeGrowthDelta, TreeSnapshot } from "@/lib/contracts";
 import { GardenErrorBoundary } from "./GardenErrorBoundary";
 import { GardenFallback } from "./GardenFallback";
 import { GardenWorld } from "./GardenWorld";
@@ -15,6 +16,10 @@ import "./garden.css";
 export interface SakuraSceneProps {
   snapshot: TreeSnapshot;
   quality?: QualityTier;
+  motionMode?: "active" | "ambient" | "paused";
+  weatherKind?: GardenWeatherKind;
+  growthDelta?: TreeGrowthDelta;
+  returnBudEntryId?: string;
   selectedEntryId?: string | null;
   onSelectEntry?: (entryId: string) => void;
   onContextLost?: () => void;
@@ -38,6 +43,10 @@ function canUseWebGL(): boolean {
 export function SakuraScene({
   snapshot,
   quality: requestedQuality,
+  motionMode = "active",
+  weatherKind = "still",
+  growthDelta,
+  returnBudEntryId,
   selectedEntryId,
   onSelectEntry,
   onContextLost,
@@ -88,6 +97,11 @@ export function SakuraScene({
         onError={onContextLost}
       >
         <Canvas
+          frameloop={
+            motionMode === "active" && !preferences.reducedMotion
+              ? "always"
+              : "demand"
+          }
           dpr={[1, settings.dpr]}
           camera={{ position: [0, 0, 9.4], fov: 32, near: 0.05, far: 60 }}
           gl={{
@@ -110,6 +124,10 @@ export function SakuraScene({
           <GardenWorld
             snapshot={snapshot}
             topology={topology}
+            motionMode={motionMode}
+            weatherKind={weatherKind}
+            growthDelta={growthDelta}
+            returnBudEntryId={returnBudEntryId}
             quality={preferences.quality}
             foliageLimit={settings.foliageLimit}
             petalCount={settings.petalCount}

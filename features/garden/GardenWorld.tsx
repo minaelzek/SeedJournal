@@ -4,7 +4,8 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
-import type { TreeSnapshot } from "@/lib/contracts";
+import type { GardenWeatherKind } from "@/features/reflection";
+import type { TreeGrowthDelta, TreeSnapshot } from "@/lib/contracts";
 import {
   gardenCameraDistance,
   gardenLookAtY,
@@ -12,12 +13,17 @@ import {
 } from "./art/framing";
 import { boundsForGarden, stageForGarden } from "./art/stage";
 import { readGardenMaterialPalette } from "./materials";
+import { gardenLifeForWeather } from "./lifeState";
 import { SakuraTree } from "./SakuraTree";
 import type { QualityTier, TreeTopology } from "./types";
 
 interface GardenWorldProps {
   snapshot: TreeSnapshot;
   topology: TreeTopology;
+  motionMode: "active" | "ambient" | "paused";
+  weatherKind: GardenWeatherKind;
+  growthDelta?: TreeGrowthDelta;
+  returnBudEntryId?: string;
   quality: QualityTier;
   foliageLimit: number;
   petalCount: number;
@@ -30,6 +36,10 @@ interface GardenWorldProps {
 export function GardenWorld({
   snapshot,
   topology,
+  motionMode,
+  weatherKind,
+  growthDelta,
+  returnBudEntryId,
   quality,
   foliageLimit,
   petalCount,
@@ -39,12 +49,13 @@ export function GardenWorld({
   onSustainedSlowFrameRate,
 }: GardenWorldProps) {
   const palette = useMemo(() => readGardenMaterialPalette(), []);
+  const life = gardenLifeForWeather(weatherKind);
   const stage = useMemo(
     () => stageForGarden(snapshot, topology),
     [snapshot, topology],
   );
   const bounds = useMemo(() => boundsForGarden(topology, stage), [stage, topology]);
-  const { camera, gl, pointer, size } = useThree();
+  const { camera, gl, invalidate, pointer, size } = useThree();
   const portraitTree =
     size.width < 600 && (stage === "established" || stage === "mature");
   const organPresentationScale = gardenOrganPresentationScale(
@@ -63,6 +74,14 @@ export function GardenWorld({
     gl.toneMapping = THREE.ACESFilmicToneMapping;
     gl.toneMappingExposure = 1.16;
   }, [gl, palette.void]);
+
+  useEffect(() => {
+    if (motionMode !== "ambient" || reducedMotion) return;
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") invalidate();
+    }, 80);
+    return () => window.clearInterval(interval);
+  }, [invalidate, motionMode, reducedMotion]);
 
   useEffect(() => {
     const distance = gardenCameraDistance({
@@ -117,7 +136,7 @@ export function GardenWorld({
       camera.lookAt(desiredLookAt);
     }
 
-    if (!slowReported.current) {
+    if (motionMode === "active" && !slowReported.current) {
       frameTimes.current.push(delta);
       if (frameTimes.current.length > 120) frameTimes.current.shift();
       if (frameTimes.current.length === 120) {
@@ -137,26 +156,32 @@ export function GardenWorld({
         attach="fog"
         args={[
           palette.void,
-          portraitTree ? 30 : 13,
-          portraitTree ? 60 : 28,
+          portraitTree ? 30 : 13 + life.fogNearOffset,
+          portraitTree ? 60 : 28 + life.fogFarOffset,
         ]}
       />
       <hemisphereLight
-        args={[palette.moon, palette.ground, portraitTree ? 1.72 : 1.18]}
+        args={[
+          palette.moon,
+          palette.ground,
+          (portraitTree ? 1.72 : 1.18) * life.lightScale,
+        ]}
         position={[0, 7, 0]}
       />
       <directionalLight
         color={palette.moon}
-        intensity={3.4}
+        intensity={3.4 * life.lightScale}
         position={[5.5, 8.5, 6]}
       />
       <directionalLight
         color={palette.moonMuted}
-        intensity={portraitTree ? 1.4 : 0.58}
+        intensity={(portraitTree ? 1.4 : 0.58) * life.lightScale}
         position={[-5, 1.5, -3]}
       />
       <SakuraTree
         topology={topology}
+        growthDelta={growthDelta}
+        returnBudEntryId={returnBudEntryId}
         stage={stage}
         palette={palette}
         petalCount={petalCount}
@@ -165,6 +190,7 @@ export function GardenWorld({
         quality={quality}
         rootSeed={snapshot.rootSeed}
         reducedMotion={reducedMotion}
+        weatherKind={weatherKind}
         selectedEntryId={selectedEntryId}
         onSelectEntry={onSelectEntry}
       />

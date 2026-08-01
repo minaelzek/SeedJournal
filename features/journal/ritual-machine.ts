@@ -42,13 +42,29 @@ export type RitualAction =
       previousBodies?: readonly string[];
       previousFollowUpIds?: readonly string[];
     }
+  | {
+      type: "offer-second-reflection";
+      previousBodies?: readonly string[];
+      previousFollowUpIds?: readonly string[];
+    }
+  | {
+      type: "different-second-follow-up";
+      previousBodies?: readonly string[];
+      previousFollowUpIds?: readonly string[];
+    }
   | { type: "answer-follow-up"; response: string }
+  | { type: "answer-second-follow-up"; response: string }
   | { type: "continue-from-follow-up" }
+  | { type: "continue-from-second-follow-up" }
   | { type: "skip-follow-up" }
+  | { type: "skip-second-follow-up" }
   | { type: "keep-small-seed" }
   | { type: "set-seed-insight"; seedInsight: string }
+  | { type: "set-return-bud"; scheduled: boolean }
   | { type: "continue-with-seed-insight" }
   | { type: "skip-seed-insight" }
+  | { type: "return-to-first-reflection" }
+  | { type: "return-to-reflection" }
   | { type: "return-to-writing" }
   | { type: "nurture"; completionId: string };
 
@@ -57,12 +73,18 @@ function initialPayload(
   category: PromptCategory,
   openingOffset = 0,
 ): JournalEntryPayloadV1 {
-  const prompt = selectDailyOpeningPrompt({
-    category,
-    localDay: options.localDay,
-    identitySeed: options.identitySeed,
-    alternateOffset: openingOffset,
-  });
+  const prompt =
+    options.kind === "revisit" && openingOffset === 0
+      ? {
+          id: "return-bud-revisit",
+          text: "You left this with the tree. What feels different now?",
+        }
+      : selectDailyOpeningPrompt({
+          category,
+          localDay: options.localDay,
+          identitySeed: options.identitySeed,
+          alternateOffset: openingOffset,
+        });
   return {
     version: 1,
     kind: options.kind ?? "entry",
@@ -89,7 +111,10 @@ export function createRitualState(
   options: NewJournalOptions,
   restored?: JournalRitualDraft,
 ): RitualState {
-  const category = restored?.entry.prompt.category ?? options.category ?? "moment";
+  const category =
+    restored?.entry.prompt.category ??
+    options.category ??
+    (options.kind === "revisit" ? "change" : "moment");
   return {
     entryId: options.entryId,
     localDay: options.localDay,
@@ -168,6 +193,73 @@ function withFollowUp(
   };
 }
 
+function withSecondFollowUp(
+  state: RitualState,
+  options: {
+    offset: number;
+    previousBodies?: readonly string[];
+    previousFollowUpIds?: readonly string[];
+  },
+): RitualState {
+  const combinedReflection = [
+    state.entry.body,
+    state.entry.followUp?.response,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const reflection = evaluateReflection(combinedReflection, {
+    category: state.category,
+    renderedPrompt: state.entry.prompt.renderedText,
+  });
+  const previousFollowUpIds = [
+    ...(state.entry.followUp?.id ? [state.entry.followUp.id] : []),
+    ...(options.previousFollowUpIds ?? []),
+  ];
+  const followUp = selectFollowUp({
+    entryId: `${state.entryId}|second`,
+    reflection,
+    body: combinedReflection,
+    previousBodies: options.previousBodies,
+    previousFollowUpIds,
+    differentQuestionOffset: options.offset,
+  });
+
+  return {
+    ...state,
+    stage: "second-reflection-offered",
+    followUpOffset: options.offset,
+    entry: {
+      ...state.entry,
+      reflection,
+      secondFollowUp: {
+        id: followUp.id,
+        target: followUp.target,
+        renderedText: followUp.renderedText,
+        response: "",
+        skipped: false,
+      },
+    },
+  };
+}
+
+function reflectionAcrossConversation(state: RitualState) {
+  const conversation = [
+    state.entry.body,
+    state.entry.followUp?.skipped
+      ? ""
+      : state.entry.followUp?.response,
+    state.entry.secondFollowUp?.skipped
+      ? ""
+      : state.entry.secondFollowUp?.response,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  return evaluateReflection(conversation, {
+    category: state.category,
+    renderedPrompt: state.entry.prompt.renderedText,
+  });
+}
+
 export function ritualReducer(
   state: RitualState,
   action: RitualAction,
@@ -203,6 +295,18 @@ export function ritualReducer(
         previousBodies: action.previousBodies,
         previousFollowUpIds: action.previousFollowUpIds,
       });
+    case "offer-second-reflection":
+      return withSecondFollowUp(state, {
+        offset: 0,
+        previousBodies: action.previousBodies,
+        previousFollowUpIds: action.previousFollowUpIds,
+      });
+    case "different-second-follow-up":
+      return withSecondFollowUp(state, {
+        offset: state.followUpOffset + 1,
+        previousBodies: action.previousBodies,
+        previousFollowUpIds: action.previousFollowUpIds,
+      });
     case "answer-follow-up":
       return {
         ...state,
@@ -217,8 +321,38 @@ export function ritualReducer(
             : undefined,
         },
       };
+    case "answer-second-follow-up":
+      return {
+        ...state,
+        entry: {
+          ...state.entry,
+          secondFollowUp: state.entry.secondFollowUp
+            ? {
+                ...state.entry.secondFollowUp,
+                response: action.response,
+                skipped: false,
+              }
+            : undefined,
+        },
+      };
     case "continue-from-follow-up":
-      return { ...state, stage: "follow-up-answered" };
+      return {
+        ...state,
+        stage: "follow-up-answered",
+        entry: {
+          ...state.entry,
+          reflection: reflectionAcrossConversation(state),
+        },
+      };
+    case "continue-from-second-follow-up":
+      return {
+        ...state,
+        stage: "second-reflection-answered",
+        entry: {
+          ...state.entry,
+          reflection: reflectionAcrossConversation(state),
+        },
+      };
     case "skip-follow-up":
       return {
         ...state,
@@ -227,6 +361,21 @@ export function ritualReducer(
           ...state.entry,
           followUp: state.entry.followUp
             ? { ...state.entry.followUp, response: "", skipped: true }
+            : undefined,
+        },
+      };
+    case "skip-second-follow-up":
+      return {
+        ...state,
+        stage: "second-reflection-skipped",
+        entry: {
+          ...state.entry,
+          secondFollowUp: state.entry.secondFollowUp
+            ? {
+                ...state.entry.secondFollowUp,
+                response: "",
+                skipped: true,
+              }
             : undefined,
         },
       };
@@ -240,9 +389,31 @@ export function ritualReducer(
         },
       };
     case "set-seed-insight":
+      if (action.seedInsight.trim()) {
+        return {
+          ...state,
+          entry: { ...state.entry, seedInsight: action.seedInsight },
+        };
+      }
       return {
         ...state,
-        entry: { ...state.entry, seedInsight: action.seedInsight },
+        entry: withoutReturnBud({
+          ...state.entry,
+          seedInsight: action.seedInsight,
+        }),
+      };
+    case "set-return-bud":
+      return {
+        ...state,
+        entry: action.scheduled
+          ? {
+              ...state.entry,
+              returnBud: {
+                dueLocalDay: nextLocalDay(state.localDay),
+                state: "waiting",
+              },
+            }
+          : withoutReturnBud(state.entry),
       };
     case "continue-with-seed-insight":
       return { ...state, stage: "seed-insight-added" };
@@ -251,6 +422,20 @@ export function ritualReducer(
         ...state,
         stage: "seed-insight-skipped",
         entry: { ...state.entry, seedInsight: "" },
+      };
+    case "return-to-reflection":
+      return {
+        ...state,
+        stage: state.entry.secondFollowUp
+          ? "second-reflection-offered"
+          : state.entry.followUp
+            ? "reflection-offered"
+            : "writing",
+      };
+    case "return-to-first-reflection":
+      return {
+        ...state,
+        stage: state.entry.followUp ? "reflection-offered" : "writing",
       };
     case "return-to-writing":
       return { ...state, stage: "writing" };
@@ -283,10 +468,22 @@ export function ritualReducer(
   }
 }
 
+function withoutReturnBud(
+  entry: JournalEntryPayloadV1,
+): JournalEntryPayloadV1 {
+  return { ...entry, returnBud: undefined };
+}
+
+function nextLocalDay(localDay: string): string {
+  const [year, month, day] = localDay.split("-").map(Number);
+  const date = new Date(year, month - 1, day, 12);
+  date.setDate(date.getDate() + 1);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
 export function nextSeedStage(stage: RitualStage): RitualStage {
   if (stage === "follow-up-answered" || stage === "follow-up-skipped") {
     return stage;
   }
   return "follow-up-skipped";
 }
-

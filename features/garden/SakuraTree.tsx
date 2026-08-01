@@ -2,6 +2,7 @@
 
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -9,7 +10,9 @@ import {
 } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { TreeStage } from "@/lib/contracts";
+import type { GardenWeatherKind } from "@/features/reflection";
+import type { TreeGrowthDelta, TreeStage } from "@/lib/contracts";
+import { gardenLifeForWeather } from "./lifeState";
 import type { GardenMaterialPalette } from "./materials";
 import type { FoliageNode, TreeTopology } from "./types";
 import { usesTreeRootContact } from "./art/stage";
@@ -32,6 +35,7 @@ import {
   terminalBranchIndexes,
   visibleBranchIndexes,
 } from "./art/branchPresentation";
+import { sakuraOrganScale, sakuraPetalBudget } from "./art/sakuraOrganPolicy";
 import { seededRandom } from "./topology";
 
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
@@ -40,9 +44,19 @@ interface BranchSystemProps {
   topology: TreeTopology;
   palette: GardenMaterialPalette;
   quality: "high" | "balanced" | "low";
+  growthDelta?: TreeGrowthDelta;
+  reducedMotion: boolean;
+  windScale: number;
 }
 
-function BranchSystem({ topology, palette, quality }: BranchSystemProps) {
+function BranchSystem({
+  topology,
+  palette,
+  quality,
+  growthDelta,
+  reducedMotion,
+  windScale,
+}: BranchSystemProps) {
   const visibleIndices = useMemo(
     () => visibleBranchIndexes(topology),
     [topology],
@@ -72,6 +86,44 @@ function BranchSystem({ topology, palette, quality }: BranchSystemProps) {
     [quality, topology.branches],
   );
   const lenticelRef = useRef<THREE.InstancedMesh>(null);
+  const branchMaterialRef = useRef<THREE.MeshStandardMaterial>(null);
+  const branchShaderRef = useRef<{
+    uniforms: Record<string, { value: number }>;
+  } | null>(null);
+  const revealStartRef = useRef(0);
+  const revealKey = growthDelta
+    ? `${growthDelta.previousSequence}:${growthDelta.nextSequence}`
+    : "";
+
+  useEffect(() => {
+    if (!growthDelta) return;
+    revealStartRef.current = performance.now();
+  }, [growthDelta, revealKey]);
+
+  useFrame(({ clock }) => {
+    const uniforms = branchShaderRef.current?.uniforms;
+    if (!uniforms) return;
+    uniforms.uTreeTime.value = reducedMotion ? 0 : clock.getElapsedTime();
+    if (uniforms.uWindScale) {
+      uniforms.uWindScale.value = reducedMotion ? 0 : windScale;
+    }
+    if (!growthDelta) {
+      uniforms.uRevealFloor.value = -1;
+      uniforms.uRevealCeiling.value = -1;
+      uniforms.uRevealProgress.value = 1;
+      return;
+    }
+    if (reducedMotion) {
+      uniforms.uRevealFloor.value = growthDelta.previousSequence;
+      uniforms.uRevealCeiling.value = growthDelta.nextSequence;
+      uniforms.uRevealProgress.value = 1;
+      return;
+    }
+    const elapsed = performance.now() - revealStartRef.current;
+    uniforms.uRevealFloor.value = growthDelta.previousSequence;
+    uniforms.uRevealCeiling.value = growthDelta.nextSequence;
+    uniforms.uRevealProgress.value = Math.min(1, Math.max(0, elapsed / 2_150));
+  });
 
   useLayoutEffect(() => {
     const mesh = lenticelRef.current;
@@ -94,6 +146,7 @@ function BranchSystem({ topology, palette, quality }: BranchSystemProps) {
     <>
       <mesh geometry={geometry} castShadow receiveShadow>
         <meshStandardMaterial
+          ref={branchMaterialRef}
           color={palette.bark}
           vertexColors
           roughness={0.96}
@@ -101,6 +154,82 @@ function BranchSystem({ topology, palette, quality }: BranchSystemProps) {
           emissive={palette.bark}
           emissiveIntensity={0.2}
           envMapIntensity={0.18}
+          customProgramCacheKey={() =>
+            geometry.hasAttribute("growthBirthSequence")
+              ? "seedjournal-living-sakura-v1"
+              : "seedjournal-legacy-sakura-v1"
+          }
+          onBeforeCompile={(shader) => {
+            if (!geometry.hasAttribute("growthBirthSequence")) return;
+            shader.uniforms.uTreeTime = { value: 0 };
+            shader.uniforms.uWindScale = { value: windScale };
+            shader.uniforms.uRevealFloor = { value: -1 };
+            shader.uniforms.uRevealCeiling = { value: -1 };
+            shader.uniforms.uRevealProgress = { value: 1 };
+            branchShaderRef.current = shader as typeof branchShaderRef.current;
+            shader.vertexShader = shader.vertexShader
+              .replace(
+                "#include <common>",
+                `#include <common>
+attribute float growthBirthSequence;
+attribute float growthAxisProgress;
+attribute float growthWindWeight;
+uniform float uTreeTime;
+uniform float uWindScale;
+varying float vGrowthBirthSequence;
+varying float vGrowthBranchProgress;`,
+              )
+              .replace(
+                "#include <begin_vertex>",
+                `vec3 transformed = vec3(position);
+vGrowthBirthSequence = growthBirthSequence;
+vGrowthBranchProgress = uv.y;
+float sjBranchBreath =
+  sin(uTreeTime * 0.62 + growthAxisProgress * 8.0) *
+  growthWindWeight * uWindScale * 0.012;
+transformed.x += sjBranchBreath;
+transformed.z += cos(uTreeTime * 0.47 + growthAxisProgress * 6.0) *
+  growthWindWeight * uWindScale * 0.007;`,
+              );
+            shader.fragmentShader = shader.fragmentShader
+              .replace(
+                "#include <common>",
+                `#include <common>
+uniform float uRevealFloor;
+uniform float uRevealCeiling;
+uniform float uRevealProgress;
+varying float vGrowthBirthSequence;
+varying float vGrowthBranchProgress;`,
+              )
+              .replace(
+                "#include <clipping_planes_fragment>",
+                `#include <clipping_planes_fragment>
+float sjRevealBranch =
+  step(uRevealFloor + 0.5, vGrowthBirthSequence) *
+  step(vGrowthBirthSequence, uRevealCeiling + 0.5);
+if (sjRevealBranch > 0.5 && vGrowthBranchProgress > uRevealProgress) {
+  discard;
+}`,
+              )
+              .replace(
+                "#include <color_fragment>",
+                `#include <color_fragment>
+float sjHighlightBranch =
+  step(uRevealFloor + 0.5, vGrowthBirthSequence) *
+  step(vGrowthBirthSequence, uRevealCeiling + 0.5);
+float sjGrowthEdge =
+  1.0 - smoothstep(
+    0.0,
+    0.2,
+    abs(vGrowthBranchProgress - uRevealProgress)
+  );
+diffuseColor.rgb = mix(
+  diffuseColor.rgb,
+  vec3(0.73, 0.48, 0.36),
+  sjHighlightBranch * sjGrowthEdge * 0.48
+);`,
+              );
+          }}
         />
       </mesh>
       <instancedMesh
@@ -130,7 +259,10 @@ function BranchTips({
 }) {
   const ref = useRef<THREE.InstancedMesh>(null);
   const terminals = useMemo(
-    () => terminalBranchIndexes(topology),
+    () =>
+      terminalBranchIndexes(topology).filter(
+        (branchIndex) => topology.branches[branchIndex].order <= 1,
+      ),
     [topology],
   );
 
@@ -214,6 +346,7 @@ interface OrganInstancesProps {
   nodes: FoliageNode[];
   kind: OrganKind;
   palette: GardenMaterialPalette;
+  growthDelta?: TreeGrowthDelta;
   reducedMotion: boolean;
   selectedEntryId?: string | null;
   hoveredEntryId?: string | null;
@@ -221,12 +354,14 @@ interface OrganInstancesProps {
   onSelectEntry?: (entryId: string) => void;
   memoryEntryByRenderId: ReadonlyMap<number, string>;
   presentationScale: number;
+  windScale: number;
 }
 
 function OrganInstances({
   nodes,
   kind,
   palette,
+  growthDelta,
   reducedMotion,
   selectedEntryId,
   hoveredEntryId,
@@ -234,6 +369,7 @@ function OrganInstances({
   onSelectEntry,
   memoryEntryByRenderId,
   presentationScale,
+  windScale,
 }: OrganInstancesProps) {
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const stamenRef = useRef<THREE.InstancedMesh>(null);
@@ -285,15 +421,27 @@ function OrganInstances({
     }
   }, [latestSequence, nodes]);
 
+  useLayoutEffect(() => {
+    if (!growthDelta) return;
+    const opensAt = performance.now() + 980;
+    nodes.forEach((node) => {
+      if (
+        node.birthSequence > growthDelta.previousSequence &&
+        node.birthSequence <= growthDelta.nextSequence
+      ) {
+        bornAt.current.set(node.id, opensAt);
+      }
+    });
+  }, [growthDelta, nodes]);
+
   const applyInstances = useCallback(
     (elapsedTime: number, now: number) => {
       const mesh = meshRef.current;
       if (!mesh) return;
 
-      const slowBreath = Math.sin(elapsedTime * 0.19);
-      const gust = reducedMotion
+      const slowBreath = reducedMotion
         ? 0
-        : Math.pow(Math.max(0, slowBreath - 0.72) / 0.28, 2);
+        : 0.72 + Math.sin(elapsedTime * 0.24) * 0.18;
 
       nodes.forEach((node, index) => {
         const born = bornAt.current.get(node.id);
@@ -307,37 +455,38 @@ function OrganInstances({
                 ? 1320
                 : 1900;
         const linearProgress = reducedMotion
-          ? Math.min(1, elapsed / 150)
-          : Math.min(1, elapsed / duration);
+          ? Math.min(1, Math.max(0, elapsed / 150))
+          : Math.min(1, Math.max(0, elapsed / duration));
         const growth = 1 - Math.pow(1 - linearProgress, 3);
         if (linearProgress >= 1) bornAt.current.delete(node.id);
 
         const weight = organWindWeight(node);
         const phase = index * 0.37 + node.position[0] * 0.52;
-        const wind = gust * weight * (0.045 + Math.sin(phase) * 0.016);
+        const wind = reducedMotion
+          ? 0
+          : weight *
+            windScale *
+            (slowBreath * 0.028 +
+              Math.sin(elapsedTime * 0.68 + phase) * 0.012);
         transform.position.fromArray(node.position);
         transform.rotation.set(
           node.rotation[0] + wind * 0.4,
           node.rotation[1] + wind,
           node.rotation[2] - wind * 0.65,
         );
+        const speciesScale = sakuraOrganScale(
+          kind === "blossom" ? "blossom" : kind,
+        );
         const baseScale =
-          node.scale *
-          growth *
-          presentationScale *
-          (kind === "radicle"
-            ? 0.52
-            : kind === "leaf"
-              ? 0.36
-              : kind === "bud"
-                ? 0.28
-                : 0.19);
+          node.scale * growth * presentationScale * speciesScale;
         if (kind === "leaf") {
-          transform.scale.set(baseScale * 0.72, baseScale * 1.24, baseScale);
+          // Secondary foliage — flatter and smaller than blossoms.
+          transform.scale.set(baseScale * 0.88, baseScale * 1.05, baseScale);
         } else if (kind === "bud") {
           transform.scale.setScalar(baseScale);
         } else {
-          transform.scale.setScalar(baseScale);
+          // Blossoms slightly wider for a soft sakura cloud silhouette.
+          transform.scale.set(baseScale * 1.08, baseScale, baseScale * 1.08);
         }
         transform.updateMatrix();
         mesh.setMatrixAt(index, transform.matrix);
@@ -372,6 +521,7 @@ function OrganInstances({
       selectedEntryId,
       transform,
       presentationScale,
+      windScale,
     ],
   );
 
@@ -442,9 +592,17 @@ function OrganInstances({
           vertexColors
           side={THREE.DoubleSide}
           roughness={
-            kind === "radicle" ? 0.94 : kind === "leaf" ? 0.79 : 0.73
+            kind === "radicle"
+              ? 0.94
+              : kind === "leaf"
+                ? 0.82
+                : kind === "bud"
+                  ? 0.7
+                  : 0.52
           }
           metalness={0}
+          transparent={kind === "blossom"}
+          opacity={kind === "blossom" ? 0.92 : 1}
           emissive={
             kind === "radicle"
               ? palette.radicle
@@ -452,9 +610,11 @@ function OrganInstances({
                 ? palette.leaf
                 : kind === "bud"
                   ? palette.bud
-                  : palette.blossom
+                  : palette.blossomLight
           }
-          emissiveIntensity={kind === "radicle" ? 0.12 : 0.22}
+          emissiveIntensity={
+            kind === "radicle" ? 0.1 : kind === "blossom" ? 0.16 : 0.14
+          }
         />
       </instancedMesh>
       {kind === "blossom" ? (
@@ -466,8 +626,10 @@ function OrganInstances({
           <meshStandardMaterial
             vertexColors
             color={palette.stamen}
-            roughness={0.82}
+            roughness={0.78}
             side={THREE.DoubleSide}
+            emissive={palette.stamen}
+            emissiveIntensity={0.12}
           />
         </instancedMesh>
       ) : null}
@@ -541,6 +703,8 @@ interface FallingPetalsProps {
   palette: GardenMaterialPalette;
   reducedMotion: boolean;
   seed: string;
+  petalCap: number;
+  windScale: number;
 }
 
 function FallingPetals({
@@ -548,18 +712,24 @@ function FallingPetals({
   palette,
   reducedMotion,
   seed,
+  petalCap,
+  windScale,
 }: FallingPetalsProps) {
-  const actualCount = reducedMotion ? 0 : Math.min(6, count);
+  // quality is not on props — derive budget from petalCap (weather) with high ceiling.
+  const actualCount = reducedMotion
+    ? 0
+    : sakuraPetalBudget("high", Math.max(petalCap, count));
   const meshRef = useRef<THREE.InstancedMesh>(null);
   const petals = useMemo(() => {
     const random = seededRandom(`quiet-petals:${seed}`);
     return Array.from({ length: actualCount }, (_, index) => ({
-      x: (random() - 0.5) * 7,
-      y: random() * 6 - 1,
-      z: (random() - 0.5) * 2.8,
-      drift: 0.07 + random() * 0.07,
-      fall: 0.045 + random() * 0.055,
+      x: (random() - 0.5) * 8.2,
+      y: random() * 6.4 - 1,
+      z: (random() - 0.5) * 3.2,
+      drift: 0.08 + random() * 0.09,
+      fall: 0.04 + random() * 0.05,
       phase: index * 1.37 + random() * 3,
+      size: 0.07 + random() * 0.04,
     }));
   }, [actualCount, seed]);
   const geometry = useMemo(() => buildNotchedPetalGeometry(), []);
@@ -569,8 +739,8 @@ function FallingPetals({
     const mesh = meshRef.current;
     if (!mesh || actualCount === 0) return;
     petals.forEach((petal, index) => {
-      petal.x += delta * petal.drift;
-      petal.y -= delta * petal.fall;
+      petal.x += delta * petal.drift * windScale;
+      petal.y -= delta * petal.fall * (0.82 + windScale * 0.18);
       if (petal.y < -3.1) {
         petal.y = 3.8;
         petal.x = -3.5;
@@ -585,7 +755,7 @@ function FallingPetals({
         petal.phase,
         clock.elapsedTime * 0.11,
       );
-      transform.scale.setScalar(0.055);
+      transform.scale.setScalar(petal.size);
       transform.updateMatrix();
       mesh.setMatrixAt(index, transform.matrix);
     });
@@ -600,12 +770,14 @@ function FallingPetals({
       frustumCulled
     >
       <meshStandardMaterial
-        color={palette.blossom}
-        roughness={0.8}
+        color={palette.blossomLight}
+        roughness={0.62}
         transparent
-        opacity={0.7}
+        opacity={0.78}
         side={THREE.DoubleSide}
         depthWrite={false}
+        emissive={palette.blossom}
+        emissiveIntensity={0.08}
       />
     </instancedMesh>
   );
@@ -677,8 +849,61 @@ function MemoryHitTargets({
   );
 }
 
+function ReturnBudPresence({
+  position,
+  palette,
+  reducedMotion,
+}: {
+  position: readonly [number, number, number];
+  palette: GardenMaterialPalette;
+  reducedMotion: boolean;
+}) {
+  const groupRef = useRef<THREE.Group>(null);
+
+  useFrame(({ clock }) => {
+    const group = groupRef.current;
+    if (!group || reducedMotion) return;
+    const pulse = (Math.sin(clock.getElapsedTime() * 1.15) + 1) * 0.5;
+    group.position.y = position[1] + pulse * 0.035;
+    group.scale.setScalar(0.9 + pulse * 0.16);
+  });
+
+  return (
+    <group ref={groupRef} position={position}>
+      <pointLight
+        color={palette.blossomLight}
+        intensity={0.9}
+        distance={0.78}
+        decay={2}
+      />
+      <mesh>
+        <sphereGeometry args={[0.065, 16, 12]} />
+        <meshPhysicalMaterial
+          color={palette.blossomLight}
+          emissive={palette.blossom}
+          emissiveIntensity={0.62}
+          roughness={0.36}
+          clearcoat={0.7}
+          transparent
+          opacity={0.88}
+        />
+      </mesh>
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <torusGeometry args={[0.12, 0.008, 8, 28]} />
+        <meshBasicMaterial
+          color={palette.blossomLight}
+          transparent
+          opacity={0.28}
+          depthWrite={false}
+        />
+      </mesh>
+    </group>
+  );
+}
+
 interface SakuraTreeProps {
   topology: TreeTopology;
+  growthDelta?: TreeGrowthDelta;
   stage: TreeStage;
   palette: GardenMaterialPalette;
   petalCount: number;
@@ -687,12 +912,15 @@ interface SakuraTreeProps {
   quality: "high" | "balanced" | "low";
   rootSeed: string;
   reducedMotion: boolean;
+  weatherKind: GardenWeatherKind;
+  returnBudEntryId?: string;
   selectedEntryId?: string | null;
   onSelectEntry?: (entryId: string) => void;
 }
 
 export function SakuraTree({
   topology,
+  growthDelta,
   stage,
   palette,
   petalCount,
@@ -701,9 +929,13 @@ export function SakuraTree({
   quality,
   rootSeed,
   reducedMotion,
+  weatherKind,
+  returnBudEntryId,
   selectedEntryId,
   onSelectEntry,
 }: SakuraTreeProps) {
+  const treeGroupRef = useRef<THREE.Group>(null);
+  const life = gardenLifeForWeather(weatherKind);
   const [hoveredEntryId, setHoveredEntryId] = useState<string | null>(null);
   const memoryEntryByRenderId = useMemo(
     () =>
@@ -738,6 +970,7 @@ export function SakuraTree({
   );
   const organProps = {
     palette,
+    growthDelta,
     reducedMotion,
     selectedEntryId,
     hoveredEntryId,
@@ -745,15 +978,29 @@ export function SakuraTree({
     onSelectEntry,
     memoryEntryByRenderId,
     presentationScale: organPresentationScale,
+    windScale: life.windScale,
   };
   const selectedRegion = selectedEntryId
     ? topology.memoryHitRegions?.find(
         (region) => region.entryId === selectedEntryId,
       )
     : undefined;
+  const returnBudRegion = returnBudEntryId
+    ? topology.memoryHitRegions?.find(
+        (region) => region.entryId === returnBudEntryId,
+      )
+    : undefined;
+
+  useFrame(({ clock }) => {
+    const group = treeGroupRef.current;
+    if (!group || reducedMotion) return;
+    const time = clock.getElapsedTime();
+    group.rotation.z = Math.sin(time * 0.18) * 0.0032 * life.windScale;
+    group.position.y = Math.sin(time * 0.14) * 0.006 * life.windScale;
+  });
 
   return (
-    <group position={[0, 0, 0]}>
+    <group ref={treeGroupRef} position={[0, 0, 0]}>
       {selectedRegion ? (
         <pointLight
           color={palette.moon}
@@ -763,9 +1010,23 @@ export function SakuraTree({
           position={selectedRegion.position}
         />
       ) : null}
+      {returnBudRegion ? (
+        <ReturnBudPresence
+          position={returnBudRegion.position}
+          palette={palette}
+          reducedMotion={reducedMotion}
+        />
+      ) : null}
       <SeedSculpture stage={stage} palette={palette} />
       <RootContact stage={stage} palette={palette} />
-      <BranchSystem topology={topology} palette={palette} quality={quality} />
+      <BranchSystem
+        topology={topology}
+        palette={palette}
+        quality={quality}
+        growthDelta={growthDelta}
+        reducedMotion={reducedMotion}
+        windScale={life.windScale}
+      />
       <BranchTips topology={topology} palette={palette} />
       <OrganInstances
         nodes={groups.radicles}
@@ -789,6 +1050,8 @@ export function SakuraTree({
         palette={palette}
         reducedMotion={reducedMotion}
         seed={rootSeed}
+        petalCap={life.petalCap}
+        windScale={life.windScale}
       />
     </group>
   );

@@ -11,6 +11,15 @@ export type {
   RitualAction,
   RitualState,
 } from "./ritual-machine";
+export {
+  ritualNurturedCopy,
+  ritualProgress,
+  RITUAL_PROGRESS_LABELS,
+} from "./ritualProgress";
+export type {
+  RitualProgress,
+  RitualProgressLabel,
+} from "./ritualProgress";
 export { measureReflectionEligibility } from "./text-metrics";
 export type {
   CompletionResult,

@@ -317,7 +317,8 @@ describe("Seed-to-Sakura V2 topology", () => {
     expect(centralVoid).toBeGreaterThanOrEqual(0.35);
     expect(centralVoid).toBeLessThanOrEqual(0.45);
     expect(anonymousOrgans.length).toBeGreaterThanOrEqual(300);
-    expect(anonymousOrgans.length).toBeLessThanOrEqual(700);
+    // Sakura-forward ambient organs densify the crown; stay well under GPU blowup.
+    expect(anonymousOrgans.length).toBeLessThanOrEqual(780);
   });
 
   it("has a grounded trunk and attached, readable scaffolds by 48 units", () => {

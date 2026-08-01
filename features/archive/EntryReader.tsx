@@ -10,6 +10,7 @@ import {
 import { useState } from "react";
 import { EntryEditor, type DecryptedJournalEntry } from "@/features/journal";
 import type { JournalEntryPayloadV1 } from "@/lib/contracts";
+import "./archive.css";
 
 export interface EntryReaderProps {
   entry: DecryptedJournalEntry;
@@ -62,24 +63,24 @@ export function EntryReader({
   };
 
   return (
-    <article className="min-h-[100dvh] bg-[var(--color-surface)] text-[var(--color-text-primary)]">
-      <div className="mx-auto w-full max-w-[760px] px-5 pb-[calc(56px+env(safe-area-inset-bottom))] pt-[calc(20px+env(safe-area-inset-top))] sm:px-8 lg:px-10">
-        <header className="mb-14 flex min-h-11 items-center justify-between gap-3">
+    <article className="sj-entry-reader" id="main-content">
+      <div className="sj-entry-reader__shell">
+        <header className="sj-entry-reader__header">
           <button
             type="button"
             onClick={onBack}
             aria-label="Back to journal"
-            className="inline-flex size-11 items-center justify-center rounded-[var(--radius-control)] text-[var(--color-text-secondary)] outline-none transition-colors hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+            className="sj-entry-reader__icon-btn"
           >
             <ArrowLeft aria-hidden size={20} />
           </button>
-          <div className="flex items-center gap-2">
+          <div className="sj-entry-reader__actions">
             {editing ? (
               <button
                 type="button"
                 onClick={() => void save()}
                 disabled={Boolean(pending)}
-                className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-blossom-light)] px-4 font-[var(--font-ui)] text-[14px] font-medium text-[var(--color-surface)] outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] disabled:opacity-40"
+                className="sj-entry-reader__btn sj-entry-reader__btn--primary"
               >
                 {pending === "save" ? (
                   <SpinnerGap aria-hidden className="animate-spin" size={17} />
@@ -92,7 +93,7 @@ export function EntryReader({
               <button
                 type="button"
                 onClick={() => setEditing(true)}
-                className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border)] px-4 font-[var(--font-ui)] text-[14px] outline-none transition-colors hover:bg-[var(--color-surface-raised)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                className="sj-entry-reader__btn"
               >
                 <PencilSimple aria-hidden size={17} />
                 Edit
@@ -101,16 +102,13 @@ export function EntryReader({
           </div>
         </header>
 
-        <time
-          dateTime={new Date(date).toISOString()}
-          className="font-[var(--font-ui)] text-[13px] leading-[18px] text-[var(--color-text-secondary)]"
-        >
+        <time dateTime={new Date(date).toISOString()}>
           {new Intl.DateTimeFormat(undefined, {
             dateStyle: "long",
           }).format(date)}
         </time>
 
-        <p className="mb-10 mt-4 text-balance font-[var(--font-poetic)] text-[26px] leading-[34px] sm:text-[32px] sm:leading-[40px]">
+        <p className="sj-entry-reader__prompt">
           {entry.payload.prompt.renderedText}
         </p>
 
@@ -126,76 +124,66 @@ export function EntryReader({
         ) : (
           <>
             {draft.title ? (
-              <h1 className="mb-7 font-[var(--font-poetic)] text-[24px] leading-[30px]">
-                {draft.title}
-              </h1>
+              <h1 className="sj-entry-reader__title">{draft.title}</h1>
             ) : null}
-            <div className="whitespace-pre-wrap font-[var(--font-poetic)] text-[18px] leading-[30px]">
-              {draft.body}
-            </div>
+            <div className="sj-entry-reader__body">{draft.body}</div>
           </>
         )}
 
-        {!editing && draft.followUp ? (
-          <section className="mt-12 border-l border-[var(--color-blossom)] pl-5 sm:pl-7">
-            <h2 className="font-[var(--font-poetic)] text-[20px] leading-[28px]">
-              {draft.followUp.renderedText}
-            </h2>
-            {draft.followUp.skipped ? (
-              <p className="mt-3 font-[var(--font-ui)] text-[13px] text-[var(--color-text-secondary)]">
-                Left open.
-              </p>
-            ) : (
-              <p className="mt-4 whitespace-pre-wrap font-[var(--font-poetic)] text-[18px] leading-[30px] text-[var(--color-text-secondary)]">
-                {draft.followUp.response}
-              </p>
-            )}
-          </section>
-        ) : null}
+        {!editing
+          ? [draft.followUp, draft.secondFollowUp].map((reflection, index) =>
+              reflection ? (
+                <section className="sj-entry-reader__layer" key={reflection.id}>
+                  <p className="sj-entry-reader__layer-label">
+                    {index === 0 ? "Reflection" : "One layer deeper"}
+                  </p>
+                  <h2>{reflection.renderedText}</h2>
+                  {reflection.skipped ? (
+                    <p data-skipped>Left open.</p>
+                  ) : (
+                    <p>{reflection.response}</p>
+                  )}
+                </section>
+              ) : null,
+            )
+          : null}
 
         {!editing && draft.seedInsight ? (
-          <section className="mt-12 rounded-[var(--radius-surface)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-6 sm:p-8">
-            <p className="font-[var(--font-ui)] text-[13px] leading-[18px] text-[var(--color-text-secondary)]">
-              What you carried
-            </p>
-            <p className="mt-3 font-[var(--font-poetic)] text-[20px] leading-[30px]">
-              {draft.seedInsight}
-            </p>
+          <section className="sj-entry-reader__seed">
+            <p>What you carried</p>
+            <p>{draft.seedInsight}</p>
           </section>
         ) : null}
 
         {error ? (
-          <p
-            role="alert"
-            className="mt-8 rounded-[var(--radius-control)] border border-[var(--color-destructive)] p-4 font-[var(--font-ui)] text-[14px] leading-5"
-          >
+          <p role="alert" className="sj-entry-reader__error">
             {error}
           </p>
         ) : null}
 
         {!editing ? (
-          <footer className="mt-14 border-t border-[var(--color-border)] pt-8">
+          <footer className="sj-entry-reader__footer">
             <button
               type="button"
               onClick={() => onRevisit(entry.id)}
-              className="inline-flex min-h-12 items-center justify-center rounded-[var(--radius-control)] bg-[var(--color-blossom-light)] px-5 font-[var(--font-ui)] text-[14px] font-medium text-[var(--color-surface)] outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+              className="sj-entry-reader__btn sj-entry-reader__btn--primary"
             >
               Revisit this memory
             </button>
 
-            <div className="mt-12">
+            <div className="sj-entry-reader__danger">
               {confirmingDelete ? (
-                <div className="rounded-[var(--radius-surface)] border border-[var(--color-destructive)] p-5">
-                  <p className="font-[var(--font-ui)] text-[14px] leading-[22px]">
+                <div className="sj-entry-reader__danger-panel">
+                  <p>
                     Delete the encrypted entry? Its anonymous growth will remain
                     on your tree.
                   </p>
-                  <div className="mt-4 flex flex-wrap gap-3">
+                  <div className="sj-entry-reader__danger-actions">
                     <button
                       type="button"
                       disabled={Boolean(pending)}
                       onClick={() => void remove()}
-                      className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-destructive)] px-4 font-[var(--font-ui)] text-[14px] text-[var(--color-text-primary)] outline-none transition-opacity hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] disabled:opacity-40"
+                      className="sj-entry-reader__btn sj-entry-reader__btn--danger"
                     >
                       {pending === "delete" ? (
                         <SpinnerGap
@@ -211,7 +199,7 @@ export function EntryReader({
                     <button
                       type="button"
                       onClick={() => setConfirmingDelete(false)}
-                      className="min-h-11 rounded-[var(--radius-control)] border border-[var(--color-border)] px-4 font-[var(--font-ui)] text-[14px] outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                      className="sj-entry-reader__btn"
                     >
                       Keep it
                     </button>
@@ -221,7 +209,7 @@ export function EntryReader({
                 <button
                   type="button"
                   onClick={() => setConfirmingDelete(true)}
-                  className="inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2 font-[var(--font-ui)] text-[13px] text-[var(--color-text-secondary)] outline-none transition-colors hover:text-[var(--color-destructive)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+                  className="sj-entry-reader__btn sj-entry-reader__btn--quiet"
                 >
                   <Trash aria-hidden size={16} />
                   Delete entry
@@ -234,4 +222,3 @@ export function EntryReader({
     </article>
   );
 }
-

@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Check,
+  FlowerLotus,
   Leaf,
   SpinnerGap,
 } from "@phosphor-icons/react";
@@ -21,6 +22,10 @@ import {
   ritualReducer,
   type RitualState,
 } from "./ritual-machine";
+import {
+  ritualNurturedCopy,
+  ritualProgress,
+} from "./ritualProgress";
 import { measureReflectionEligibility } from "./text-metrics";
 import type {
   CompletionResult,
@@ -29,6 +34,7 @@ import type {
   NewJournalOptions,
   SaveState,
 } from "./types";
+import "./journal.css";
 
 const CATEGORIES: ReadonlyArray<{
   value: PromptCategory;
@@ -43,19 +49,9 @@ const CATEGORIES: ReadonlyArray<{
   { value: "open", label: "Open page" },
 ];
 
-const THREADS = [
-  "Something I felt",
-  "A choice",
-  "Someone close",
-  "A change",
-  "What I need",
-] as const;
+const primaryButton = "sj-ritual-button sj-ritual-button--primary";
 
-const primaryButton =
-  "inline-flex min-h-14 items-center justify-center gap-2 rounded-[var(--radius-control)] bg-[var(--color-blossom-light)] px-6 font-[var(--font-ui)] text-[15px] font-medium leading-5 text-[var(--color-surface)] outline-none transition-[opacity,transform,box-shadow] duration-150 hover:opacity-90 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--color-surface)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40 disabled:active:translate-y-0";
-
-const secondaryButton =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-[var(--radius-control)] border border-[var(--color-border)] bg-transparent px-4 font-[var(--font-ui)] text-[15px] leading-5 text-[var(--color-text-primary)] outline-none transition-[background-color,border-color,transform] duration-150 hover:bg-[var(--color-surface-raised)] focus-visible:border-[var(--color-focus)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] active:translate-y-px disabled:cursor-not-allowed disabled:opacity-40";
+const secondaryButton = "sj-ritual-button sj-ritual-button--secondary";
 
 export interface JournalRitualProps extends NewJournalOptions {
   restoredDraft?: JournalRitualDraft;
@@ -66,6 +62,7 @@ export interface JournalRitualProps extends NewJournalOptions {
     result: CompletionResult,
   ) => Promise<void> | void;
   onExit?: () => void;
+  onNurtured?: () => void;
 }
 
 export function JournalRitual({
@@ -81,6 +78,7 @@ export function JournalRitual({
   onAutosave,
   onComplete,
   onExit,
+  onNurtured,
 }: JournalRitualProps) {
   const [state, dispatch] = useReducer(
     ritualReducer,
@@ -104,6 +102,14 @@ export function JournalRitual({
     () => previousEntries.slice(0, 10).map((entry) => entry.payload.body),
     [previousEntries],
   );
+  const returningInsight = useMemo(() => {
+    const sourceId = state.entry.parentEntryId;
+    if (!sourceId) return "";
+    return (
+      previousEntries.find((entry) => entry.id === sourceId)?.payload
+        .seedInsight ?? ""
+    );
+  }, [previousEntries, state.entry.parentEntryId]);
   const eligibility = useMemo(
     () => measureReflectionEligibility(state.entry.body),
     [state.entry.body],
@@ -118,6 +124,15 @@ export function JournalRitual({
     }),
     [state.entry, state.stage],
   );
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      if (window.scrollY > 0) {
+        window.scrollTo({ top: 0, behavior: "auto" });
+      }
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [state.stage]);
 
   useEffect(() => {
     if (!onAutosave || state.stage === "new" || state.stage === "nurtured") {
@@ -190,6 +205,7 @@ export function JournalRitual({
       return (
         <OpeningStep
           state={state}
+          returningInsight={returningInsight}
           onCategory={(nextCategory) =>
             dispatch({ type: "choose-category", category: nextCategory })
           }
@@ -209,15 +225,6 @@ export function JournalRitual({
           onTitle={(title) => dispatch({ type: "set-title", title })}
           onBody={(body) => dispatch({ type: "set-body", body })}
           onBlur={saveImmediately}
-          onThread={(thread) => {
-            const hasThread = state.entry.threads.includes(thread);
-            dispatch({
-              type: "set-threads",
-              threads: hasThread
-                ? state.entry.threads.filter((item) => item !== thread)
-                : [...state.entry.threads, thread],
-            });
-          }}
           onReflect={() =>
             dispatch({
               type: "offer-reflection",
@@ -234,6 +241,7 @@ export function JournalRitual({
       return (
         <FollowUpStep
           state={state}
+          round={1}
           onBack={() => dispatch({ type: "return-to-writing" })}
           onResponse={(response) =>
             dispatch({ type: "answer-follow-up", response })
@@ -245,8 +253,41 @@ export function JournalRitual({
               previousFollowUpIds,
             })
           }
-          onContinue={() => dispatch({ type: "continue-from-follow-up" })}
+          onContinue={() =>
+            dispatch({
+              type: "offer-second-reflection",
+              previousBodies,
+              previousFollowUpIds,
+            })
+          }
+          onClose={() => dispatch({ type: "continue-from-follow-up" })}
           onSkip={() => dispatch({ type: "skip-follow-up" })}
+        />
+      );
+    }
+
+    if (state.stage === "second-reflection-offered") {
+      return (
+        <FollowUpStep
+          state={state}
+          round={2}
+          onBack={() =>
+            dispatch({ type: "return-to-first-reflection" })
+          }
+          onResponse={(response) =>
+            dispatch({ type: "answer-second-follow-up", response })
+          }
+          onDifferent={() =>
+            dispatch({
+              type: "different-second-follow-up",
+              previousBodies,
+              previousFollowUpIds,
+            })
+          }
+          onContinue={() =>
+            dispatch({ type: "continue-from-second-follow-up" })
+          }
+          onSkip={() => dispatch({ type: "skip-second-follow-up" })}
         />
       );
     }
@@ -254,6 +295,8 @@ export function JournalRitual({
     if (
       state.stage === "follow-up-answered" ||
       state.stage === "follow-up-skipped" ||
+      state.stage === "second-reflection-answered" ||
+      state.stage === "second-reflection-skipped" ||
       state.stage === "seed-insight-added" ||
       state.stage === "seed-insight-skipped"
     ) {
@@ -262,19 +305,12 @@ export function JournalRitual({
           state={state}
           isCompleting={isCompleting}
           completionError={completionError}
-          onBack={() => {
-            if (state.entry.followUp) {
-              dispatch({
-                type: "answer-follow-up",
-                response: state.entry.followUp.response,
-              });
-              dispatch({ type: "return-to-writing" });
-            } else {
-              dispatch({ type: "return-to-writing" });
-            }
-          }}
+          onBack={() => dispatch({ type: "return-to-reflection" })}
           onInsight={(seedInsight) =>
             dispatch({ type: "set-seed-insight", seedInsight })
+          }
+          onReturnBud={(scheduled) =>
+            dispatch({ type: "set-return-bud", scheduled })
           }
           onNurture={() => {
             const next =
@@ -292,7 +328,7 @@ export function JournalRitual({
     return (
       <NurturedStep
         isCompleting={isCompleting}
-        onDone={onExit}
+        onDone={onNurtured ?? onExit}
       />
     );
   };
@@ -300,21 +336,23 @@ export function JournalRitual({
   return (
     <section
       aria-label="Journal reflection"
-      className="min-h-[100dvh] w-full bg-[var(--color-surface)] text-[var(--color-text-primary)]"
+      className="sj-ritual"
+      data-stage={state.stage}
     >
-      <div className="mx-auto flex min-h-[100dvh] w-full max-w-[760px] flex-col px-5 pb-[calc(24px+env(safe-area-inset-bottom))] pt-[calc(20px+env(safe-area-inset-top))] sm:px-8 lg:px-10">
-        <header className="flex min-h-11 items-center justify-between">
+      <div className="sj-ritual__shell">
+        <header className="sj-ritual__header">
           <button
             type="button"
             onClick={onExit}
             aria-label="Leave journal"
-            className="inline-flex size-11 items-center justify-center rounded-[var(--radius-control)] text-[var(--color-text-secondary)] outline-none transition-colors duration-150 hover:bg-[var(--color-surface-raised)] hover:text-[var(--color-text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+            className="sj-ritual__close"
           >
             <ArrowLeft aria-hidden size={20} weight="regular" />
           </button>
+          <RitualProgress stage={state.stage} />
           <SaveStatus state={saveState} />
         </header>
-        <div className="flex flex-1 flex-col justify-center py-8 sm:py-12">
+        <div className="sj-ritual__content">
           {renderContent()}
         </div>
       </div>
@@ -322,57 +360,98 @@ export function JournalRitual({
   );
 }
 
+function RitualProgress({ stage }: { stage: RitualState["stage"] }) {
+  const progress = ritualProgress(stage);
+
+  return (
+    <div
+      className="sj-ritual-progress"
+      data-step={progress.activeStep}
+      aria-label={`Step ${progress.stepNumber} of ${progress.stepCount}: ${progress.label}`}
+    >
+      <span className="sj-ritual-progress__label">{progress.label}</span>
+      <span className="sj-ritual-progress__dots" aria-hidden="true">
+        {progress.labels.map((label, index) => (
+          <i
+            key={label}
+            data-state={
+              index < progress.activeStep
+                ? "done"
+                : index === progress.activeStep
+                  ? "active"
+                  : "resting"
+            }
+          />
+        ))}
+      </span>
+    </div>
+  );
+}
+
 function OpeningStep({
   state,
+  returningInsight,
   onCategory,
   onDifferent,
   onBegin,
 }: {
   state: RitualState;
+  returningInsight?: string;
   onCategory: (category: PromptCategory) => void;
   onDifferent: () => void;
   onBegin: () => void;
 }) {
   return (
-    <div className="animate-[fade-in_300ms_var(--ease-enter,both)]">
-      <p className="mb-6 font-[var(--font-ui)] text-[13px] leading-[18px] text-[var(--color-text-secondary)]">
-        Where would you like to begin?
-      </p>
-      <div
-        className="-mx-1 mb-10 flex gap-2 overflow-x-auto px-1 pb-2 [scrollbar-width:none]"
-        role="radiogroup"
-        aria-label="Journal path"
-      >
-        {CATEGORIES.map((item) => {
-          const selected = item.value === state.category;
-          return (
-            <button
-              key={item.value}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              onClick={() => onCategory(item.value)}
-              className={`min-h-11 shrink-0 rounded-full border px-4 font-[var(--font-ui)] text-[14px] leading-5 outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${
-                selected
-                  ? "border-[var(--color-blossom)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)]"
-                  : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-              }`}
-            >
-              {item.label}
-            </button>
-          );
-        })}
+    <div className="sj-ritual-step sj-ritual-step--opening">
+      <div className="sj-ritual-step__intro">
+        <p className="sj-ritual-kicker">
+          {state.entry.kind === "revisit"
+            ? "A memory, returning"
+            : "Today’s reflection"}
+        </p>
+        <h1>{state.entry.prompt.renderedText}</h1>
+        {returningInsight ? (
+          <blockquote className="sj-returning-insight">
+            “{returningInsight}”
+          </blockquote>
+        ) : null}
+        <p className="sj-ritual-reassurance">
+          {state.entry.kind === "revisit"
+            ? "Notice what softened, sharpened, or remained."
+            : "Take one slow breath. Start wherever the truth feels easiest to touch."}
+        </p>
       </div>
-      <h1 className="max-w-[680px] text-balance font-[var(--font-poetic)] text-[26px] leading-[34px] text-[var(--color-text-primary)] sm:text-[32px] sm:leading-[40px]">
-        {state.entry.prompt.renderedText}
-      </h1>
-      <div className="mt-12 flex flex-wrap items-center gap-3">
+      <details className="sj-ritual-directions">
+        <summary>Choose a direction</summary>
+        <div
+          className="sj-ritual-paths"
+          role="radiogroup"
+          aria-label="Journal path"
+        >
+          {CATEGORIES.map((item) => {
+            const selected = item.value === state.category;
+            return (
+              <button
+                key={item.value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => onCategory(item.value)}
+                className="sj-ritual-path"
+              >
+                {item.label}
+              </button>
+            );
+          })}
+        </div>
+      </details>
+      <div className="sj-ritual-actions">
         <button type="button" className={primaryButton} onClick={onBegin}>
           Begin writing
           <ArrowRight aria-hidden size={18} />
         </button>
         <button type="button" className={secondaryButton} onClick={onDifferent}>
-          Choose another path
+          Another prompt
         </button>
       </div>
     </div>
@@ -386,7 +465,6 @@ function WritingStep({
   onTitle,
   onBody,
   onBlur,
-  onThread,
   onReflect,
   onKeepSmall,
 }: {
@@ -397,52 +475,36 @@ function WritingStep({
   onTitle: (value: string) => void;
   onBody: (value: string) => void;
   onBlur: () => void;
-  onThread: (value: string) => void;
   onReflect: () => void;
   onKeepSmall: () => void;
 }) {
   const hasBody = state.entry.body.trim().length > 0;
+  const wordCount = state.entry.body.trim()
+    ? state.entry.body.trim().split(/\s+/u).length
+    : 0;
+  const reflectionState = eligible
+    ? "There is enough here to reflect with."
+    : wordCount > 0
+      ? "Stay with it. The page is listening."
+      : "Nothing you write here needs to be polished.";
   return (
-    <div>
-      <p className="mb-8 max-w-[680px] text-balance font-[var(--font-poetic)] text-[26px] leading-[34px] text-[var(--color-text-primary)] sm:text-[32px] sm:leading-[40px]">
-        {state.entry.prompt.renderedText}
-      </p>
-      <EntryEditor
-        title={state.entry.title}
-        body={state.entry.body}
-        onTitleChange={onTitle}
-        onBodyChange={onBody}
-        onBlur={onBlur}
-        autoFocus
-      />
-      {hasBody ? (
-        <div className="mt-8 border-t border-[var(--color-border)] pt-6">
-          <p className="mb-3 font-[var(--font-ui)] text-[13px] leading-[18px] text-[var(--color-text-secondary)]">
-            A thread you may want to hold
-          </p>
-          <div className="flex flex-wrap gap-2">
-            {THREADS.map((thread) => {
-              const selected = state.entry.threads.includes(thread);
-              return (
-                <button
-                  key={thread}
-                  type="button"
-                  aria-pressed={selected}
-                  onClick={() => onThread(thread)}
-                  className={`min-h-11 rounded-full border px-4 font-[var(--font-ui)] text-[13px] leading-[18px] outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-[var(--color-focus)] ${
-                    selected
-                      ? "border-[var(--color-leaf)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)]"
-                      : "border-[var(--color-border)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)]"
-                  }`}
-                >
-                  {thread}
-                </button>
-              );
-            })}
-          </div>
+    <div className="sj-ritual-step sj-ritual-step--writing">
+      <p className="sj-ritual-prompt">{state.entry.prompt.renderedText}</p>
+      <div className="sj-writing-canvas">
+        <EntryEditor
+          title={state.entry.title}
+          body={state.entry.body}
+          onTitleChange={onTitle}
+          onBodyChange={onBody}
+          onBlur={onBlur}
+          autoFocus
+        />
+        <div className="sj-writing-canvas__footer" aria-live="polite">
+          <span>{reflectionState}</span>
+          {wordCount > 0 ? <span aria-label={`${wordCount} words`}>{wordCount} words</span> : null}
         </div>
-      ) : null}
-      <div className="mt-10 flex flex-wrap items-center gap-3">
+      </div>
+      <div className="sj-ritual-actions">
         <button
           type="button"
           className={primaryButton}
@@ -463,8 +525,8 @@ function WritingStep({
         ) : null}
       </div>
       {hasBody && !eligible ? (
-        <p className="mt-4 font-[var(--font-ui)] text-[13px] leading-[18px] text-[var(--color-text-secondary)]">
-          Stay with the page a little longer, or keep this as a small seed.
+        <p className="sj-ritual-hint">
+          Add a little more of what happened, what you felt, or why it mattered—or keep this as a small seed.
         </p>
       ) : null}
       <span className="sr-only" aria-live="polite">
@@ -476,67 +538,94 @@ function WritingStep({
 
 function FollowUpStep({
   state,
+  round,
   onBack,
   onResponse,
   onDifferent,
   onContinue,
+  onClose,
   onSkip,
 }: {
   state: RitualState;
+  round: 1 | 2;
   onBack: () => void;
   onResponse: (value: string) => void;
   onDifferent: () => void;
   onContinue: () => void;
+  onClose?: () => void;
   onSkip: () => void;
 }) {
-  const followUp = state.entry.followUp;
+  const followUp =
+    round === 2 ? state.entry.secondFollowUp : state.entry.followUp;
   if (!followUp) return null;
   const canContinue = followUp.response.trim().length > 0;
+  const responseId =
+    round === 2 ? "second-follow-up-response" : "follow-up-response";
   return (
-    <div>
+    <div
+      className="sj-ritual-step sj-ritual-step--follow-up"
+      data-reflection-round={round}
+    >
       <button
         type="button"
         onClick={onBack}
-        className="mb-7 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2 font-[var(--font-ui)] text-[14px] text-[var(--color-text-secondary)] outline-none transition-colors hover:text-[var(--color-text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+        className="sj-ritual-back"
       >
         <ArrowLeft aria-hidden size={18} />
-        Back to your entry
+        {round === 2 ? "Back to your first reflection" : "Back to your entry"}
       </button>
-      <p className="mb-4 font-[var(--font-ui)] text-[13px] leading-[18px] text-[var(--color-text-secondary)]">
-        A question to sit with
+      <p className="sj-ritual-kicker">
+        {round === 2 ? "One layer deeper" : "A question to sit with"}
       </p>
-      <h1 className="mb-9 text-balance font-[var(--font-poetic)] text-[26px] leading-[34px] text-[var(--color-text-primary)] sm:text-[32px] sm:leading-[40px]">
+      <h1>
         {followUp.renderedText}
       </h1>
-      <label className="sr-only" htmlFor="follow-up-response">
-        Your reflection
+      <p className="sj-ritual-reassurance">
+        {round === 2
+          ? "This is the final question. Follow it only as far as it feels useful."
+          : "You can answer in one honest sentence or follow the thought further."}
+      </p>
+      <label className="sr-only" htmlFor={responseId}>
+        {round === 2 ? "Your deeper reflection" : "Your reflection"}
       </label>
       <textarea
-        id="follow-up-response"
+        id={responseId}
         value={followUp.response}
         onChange={(event) => onResponse(event.target.value)}
         autoFocus
         rows={6}
         maxLength={60_000}
         placeholder="There is no perfect answer…"
-        className="w-full resize-none rounded-[var(--radius-surface)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 font-[var(--font-poetic)] text-[18px] leading-[30px] text-[var(--color-text-primary)] caret-[var(--color-blossom)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--color-text-secondary)]/60 focus-visible:border-[var(--color-focus)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/20"
+        className="sj-ritual-textarea"
       />
-      <div className="mt-8 flex flex-wrap gap-3">
+      <div className="sj-ritual-actions">
         <button
           type="button"
           className={primaryButton}
           disabled={!canContinue}
           onClick={onContinue}
         >
-          Continue
+          {round === 2 ? "Carry this with me" : "Go one layer deeper"}
           <ArrowRight aria-hidden size={18} />
         </button>
+        {round === 1 && onClose ? (
+          <button
+            type="button"
+            className={secondaryButton}
+            onClick={onClose}
+            disabled={!canContinue}
+          >
+            I&apos;m ready to carry this
+          </button>
+        ) : null}
         <button type="button" className={secondaryButton} onClick={onDifferent}>
           Different question
         </button>
-        <button type="button" className={secondaryButton} onClick={onSkip}>
-          Skip
-        </button>
+        {!canContinue ? (
+          <button type="button" className={secondaryButton} onClick={onSkip}>
+            {round === 2 ? "I’m ready to close" : "Skip for today"}
+          </button>
+        ) : null}
       </div>
     </div>
   );
@@ -548,6 +637,7 @@ function SeedInsightStep({
   completionError,
   onBack,
   onInsight,
+  onReturnBud,
   onNurture,
 }: {
   state: RitualState;
@@ -555,26 +645,25 @@ function SeedInsightStep({
   completionError?: string;
   onBack: () => void;
   onInsight: (value: string) => void;
+  onReturnBud: (scheduled: boolean) => void;
   onNurture: () => void;
 }) {
   return (
-    <div>
+    <div className="sj-ritual-step sj-ritual-step--insight">
       <button
         type="button"
         onClick={onBack}
-        className="mb-7 inline-flex min-h-11 items-center gap-2 rounded-[var(--radius-control)] px-2 font-[var(--font-ui)] text-[14px] text-[var(--color-text-secondary)] outline-none transition-colors hover:text-[var(--color-text-primary)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]"
+        className="sj-ritual-back"
       >
         <ArrowLeft aria-hidden size={18} />
-        Return to writing
+        Return to reflection
       </button>
-      <p className="mb-4 font-[var(--font-ui)] text-[13px] leading-[18px] text-[var(--color-text-secondary)]">
-        Your seed insight
-      </p>
-      <h1 className="mb-4 text-balance font-[var(--font-poetic)] text-[26px] leading-[34px] text-[var(--color-text-primary)] sm:text-[32px] sm:leading-[40px]">
+      <p className="sj-ritual-kicker">Your seed insight</p>
+      <h1>
         What do you want to carry from this?
       </h1>
-      <p className="mb-8 max-w-[560px] font-[var(--font-ui)] text-[15px] leading-6 text-[var(--color-text-secondary)]">
-        A word or a sentence is enough. You can also leave this open.
+      <p className="sj-ritual-reassurance">
+        Distill what you found into a word or sentence. This is what the tree will hold.
       </p>
       <label className="sr-only" htmlFor="seed-insight">
         Seed insight
@@ -587,9 +676,26 @@ function SeedInsightStep({
         rows={3}
         maxLength={1_000}
         placeholder="I want to remember…"
-        className="w-full resize-none rounded-[var(--radius-surface)] border border-[var(--color-border)] bg-[var(--color-surface-raised)] p-5 font-[var(--font-poetic)] text-[18px] leading-[30px] text-[var(--color-text-primary)] caret-[var(--color-blossom)] outline-none transition-[border-color,box-shadow] placeholder:text-[var(--color-text-secondary)]/60 focus-visible:border-[var(--color-focus)] focus-visible:ring-2 focus-visible:ring-[var(--color-focus)]/20"
+        className="sj-ritual-textarea sj-ritual-textarea--insight"
       />
-      <div className="mt-9">
+      <button
+        type="button"
+        className="sj-return-bud-choice"
+        aria-pressed={state.entry.returnBud?.state === "waiting"}
+        data-selected={state.entry.returnBud?.state === "waiting" || undefined}
+        disabled={!state.entry.seedInsight.trim()}
+        onClick={() =>
+          onReturnBud(state.entry.returnBud?.state !== "waiting")
+        }
+      >
+        <FlowerLotus aria-hidden size={20} weight="regular" />
+        <span>
+          <strong>Bring this back tomorrow</strong>
+          <small>A patient bud, only when you return.</small>
+        </span>
+        <i aria-hidden />
+      </button>
+      <div className="sj-ritual-actions">
         <button
           type="button"
           className={primaryButton}
@@ -606,7 +712,7 @@ function SeedInsightStep({
         {completionError ? (
           <p
             role="alert"
-            className="mt-4 max-w-[520px] font-[var(--font-ui)] text-[14px] leading-5 text-[var(--color-text-secondary)]"
+            className="sj-ritual-error"
           >
             {completionError}
           </p>
@@ -623,28 +729,27 @@ function NurturedStep({
   isCompleting: boolean;
   onDone?: () => void;
 }) {
+  const copy = ritualNurturedCopy(isCompleting);
   return (
-    <div className="mx-auto max-w-[520px] text-center" aria-live="polite">
-      <span className="mx-auto mb-8 inline-flex size-14 items-center justify-center rounded-full border border-[var(--color-border)] bg-[var(--color-surface-raised)] text-[var(--color-blossom-light)]">
+    <div className="sj-ritual-step sj-ritual-step--nurtured" aria-live="polite">
+      <span className="sj-ritual-grown-mark" data-completing={isCompleting || undefined}>
         {isCompleting ? (
           <SpinnerGap aria-hidden className="animate-spin" size={24} />
         ) : (
-          <Check aria-hidden size={24} weight="regular" />
+          <Leaf aria-hidden size={24} weight="regular" />
         )}
       </span>
-      <h1 className="text-balance font-[var(--font-poetic)] text-[30px] leading-[38px] text-[var(--color-text-primary)] sm:text-[36px] sm:leading-[44px]">
-        Your reflection has taken its place.
-      </h1>
-      <p className="mt-4 font-[var(--font-ui)] text-[15px] leading-6 text-[var(--color-text-secondary)]">
-        Your reflection is part of the living record now.
-      </p>
+      <p className="sj-ritual-kicker">Care complete</p>
+      <h1>{copy.title}</h1>
+      <p className="sj-ritual-reassurance">{copy.detail}</p>
       <button
         type="button"
-        className={`${primaryButton} mt-10`}
+        className={primaryButton}
         onClick={onDone}
         disabled={isCompleting}
       >
-        Return to the garden
+        {copy.ctaLabel}
+        {!isCompleting ? <ArrowRight aria-hidden size={18} /> : null}
       </button>
     </div>
   );
@@ -662,7 +767,7 @@ function SaveStatus({ state }: { state: SaveState }) {
   return (
     <span
       role="status"
-      className="inline-flex min-h-11 items-center gap-2 px-2 font-[var(--font-ui)] text-[13px] leading-[18px] text-[var(--color-text-secondary)]"
+      className="sj-ritual-save"
     >
       {state === "saving" ? (
         <SpinnerGap aria-hidden className="animate-spin" size={14} />

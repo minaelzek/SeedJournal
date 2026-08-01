@@ -14,13 +14,15 @@ export function gardenCameraDistance(input: {
 
   const landscapeCompensation =
     width / Math.max(height, 1) > 1.4 ? 1.18 : 1.25;
+  // Slightly closer for denser sakura crown so flowers fill optical center.
+  // Established/mature desktop formula stays 1 (tests lock horizontal fit).
   const stageDistanceScale =
     stage === "sprout"
-      ? 1.34
+      ? 1.3
       : stage === "sapling"
-        ? 1.72
+        ? 1.68
         : stage === "young-tree"
-          ? 1.18
+          ? 1.14
           : 1;
   const minimum = stage === "sprout" ? (compact ? 7.4 : 9.2) : 5.2;
   const verticalFitDistance =

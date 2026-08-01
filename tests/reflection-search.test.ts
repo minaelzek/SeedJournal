@@ -60,5 +60,21 @@ describe("local decrypted archive search", () => {
       "one",
     ]);
   });
-});
 
+  it("indexes the deeper reflection without exposing it outside local search", () => {
+    const layered = entry("layered", "I am sitting with this.", "moment", 300);
+    layered.payload.secondFollowUp = {
+      id: "follow-up-layered",
+      target: "deepen",
+      renderedText: "What can remain unresolved?",
+      response: "I can allow uncertainty without abandoning honesty.",
+      skipped: false,
+    };
+
+    expect(
+      searchEntries([...entries, layered], { query: "abandoning honesty" }).map(
+        (item) => item.id,
+      ),
+    ).toEqual(["layered"]);
+  });
+});
