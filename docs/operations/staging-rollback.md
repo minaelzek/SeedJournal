@@ -2,8 +2,11 @@
 
 ## Staging smoke check
 
-Deploy target is Cloudflare Workers and the D1 database named in
-`wrangler.toml`. `.openai/hosting.json` is not a deploy target.
+Deploy target is Cloudflare Workers on the `workers.dev` hostname from
+`wrangler deploy`, and the D1 database named in `wrangler.toml`.
+`.openai/hosting.json` is not a deploy target. HSTS on that workers.dev
+host does not include `includeSubDomains`. A custom domain, added later in
+`wrangler.toml`, does.
 
 Run the local Cloudflare preview after the runtime configuration is
 available:

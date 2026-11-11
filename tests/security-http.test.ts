@@ -26,6 +26,7 @@ import {
   withApi,
 } from "../app/api/_shared/http";
 import { applySecurityHeaders } from "../lib/http/security-headers";
+import { isTrustedMutationOrigin } from "../lib/http/request-origin";
 import worker from "../worker/index";
 
 const CONTENT_SECURITY_POLICY =
@@ -82,6 +83,52 @@ describe("API request protections", () => {
       if (previous === undefined) delete mutableEnv.NODE_ENV;
       else mutableEnv.NODE_ENV = previous;
     }
+  });
+
+  it("trusts the workers.dev host that received the request and not a sibling", async () => {
+    const worker = "https://seed-journal.account.workers.dev";
+    const issued = issueCsrf(new Request(`${worker}/api/auth/csrf`));
+    const same = new Request(`${worker}/api/entries`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: worker,
+        "sec-fetch-site": "same-origin",
+        cookie: `${CSRF_COOKIE}=${issued.token}`,
+        [CSRF_HEADER]: issued.token,
+      },
+      body: "{}",
+    });
+    await expect(assertSafeMutation(same)).resolves.toBeUndefined();
+
+    const sibling = new Request(`${worker}/api/entries`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://other-worker.account.workers.dev",
+        "sec-fetch-site": "same-site",
+        cookie: `${CSRF_COOKIE}=${issued.token}`,
+        [CSRF_HEADER]: issued.token,
+      },
+      body: "{}",
+    });
+    await expect(assertSafeMutation(sibling)).rejects.toMatchObject({
+      code: "invalid_origin",
+    });
+    expect(
+      isTrustedMutationOrigin(
+        new URL(`${worker}/api/entries`),
+        "https://journal.example",
+        "https://workers.dev, https://journal.example/path, https://journal.example",
+      ),
+    ).toBe(true);
+    expect(
+      isTrustedMutationOrigin(
+        new URL(`${worker}/api/entries`),
+        "https://evil.workers.dev",
+        "https://workers.dev",
+      ),
+    ).toBe(false);
   });
 
   it("rejects cross-origin and mismatched-token mutations", async () => {
@@ -234,6 +281,24 @@ describe("applySecurityHeaders", () => {
     );
     expect(secured.headers.get("x-content-type-options")).toBe("nosniff");
     expect(secured.headers.get("strict-transport-security")).toBe(
+      "max-age=15552000; includeSubDomains",
+    );
+  });
+
+  it("pins workers.dev without includeSubDomains and a custom domain with it", () => {
+    const workers = applySecurityHeaders(
+      new Response("ok"),
+      new Request("https://seed-journal.account.workers.dev/welcome"),
+    );
+    expect(workers.headers.get("strict-transport-security")).toBe(
+      "max-age=15552000",
+    );
+
+    const custom = applySecurityHeaders(
+      new Response("ok"),
+      new Request("https://journal.example/welcome"),
+    );
+    expect(custom.headers.get("strict-transport-security")).toBe(
       "max-age=15552000; includeSubDomains",
     );
   });

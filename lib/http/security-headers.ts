@@ -1,3 +1,5 @@
+import { strictTransportSecurityForHost } from "./request-origin";
+
 // Production source of truth is worker applySecurityHeaders. next.config.ts
 // mirrors this static list; Cloudflare does not rely on those headers.
 // script-src and style-src keep 'unsafe-inline' only because Next/vinext and
@@ -5,8 +7,6 @@
 
 export const CONTENT_SECURITY_POLICY =
   "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://appleid.cdn-apple.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://accounts.google.com https://appleid.apple.com; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self'; worker-src 'self' blob:; frame-src https://accounts.google.com https://appleid.apple.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
-
-export const STRICT_TRANSPORT_SECURITY = "max-age=15552000; includeSubDomains";
 
 export const SECURITY_HEADERS: ReadonlyArray<{ key: string; value: string }> = [
   { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },
@@ -36,8 +36,12 @@ export function applySecurityHeaders(
     headers.set(header.key, header.value);
   }
 
-  if (new URL(request.url).protocol === "https:") {
-    headers.set("Strict-Transport-Security", STRICT_TRANSPORT_SECURITY);
+  const requestUrl = new URL(request.url);
+  if (requestUrl.protocol === "https:") {
+    headers.set(
+      "Strict-Transport-Security",
+      strictTransportSecurityForHost(requestUrl.hostname),
+    );
   } else {
     headers.delete("Strict-Transport-Security");
   }

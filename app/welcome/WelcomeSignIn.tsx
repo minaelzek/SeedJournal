@@ -158,6 +158,8 @@ export function WelcomeSignIn() {
       window.AppleID?.auth.init({
         clientId: providers.apple.clientId,
         scope: "name email",
+        // Apple and Google must allow this exact origin. On workers.dev that is
+        // the URL Wrangler prints; a later custom domain is this origin too.
         redirectURI: window.location.origin,
         usePopup: true,
       });

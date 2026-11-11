@@ -1,5 +1,6 @@
 import { AuthenticationRequiredError } from "@/lib/auth/errors";
 import type { ApiError } from "@/lib/contracts";
+import { isTrustedMutationOrigin } from "@/lib/http/request-origin";
 
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 export const CSRF_COOKIE = "__Host-seedjournal-csrf";
@@ -143,8 +144,13 @@ export async function assertSafeMutation(request: Request): Promise<void> {
   }
 
   const url = new URL(request.url);
-  const origin = request.headers.get("origin");
-  if (!origin || origin !== url.origin) {
+  if (
+    !isTrustedMutationOrigin(
+      url,
+      request.headers.get("origin"),
+      process.env.SEED_JOURNAL_ALLOWED_ORIGINS,
+    )
+  ) {
     throw new ApiRouteError(
       403,
       "invalid_origin",
