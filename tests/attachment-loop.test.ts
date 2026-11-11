@@ -162,7 +162,7 @@ describe("attachment loop — offline growth + single-canvas reveal", () => {
       }),
     );
     expect(markup).toContain("data-fallback");
-    expect(markup).toContain("memory petal");
+    expect(markup).toContain("A bud opened on your sakura.");
     markGrowthRevealPresented("tree-x", messy, storage);
     expect(hasPresentedGrowthReveal("tree-x", messy, storage)).toBe(true);
   });
@@ -179,7 +179,7 @@ describe("attachment loop — offline growth + single-canvas reveal", () => {
     );
     const blob = `${celebration.kicker} ${celebration.title} ${celebration.detail} ${celebration.formLabel}`;
     expect(blob).not.toMatch(/\b(xp|points?|score|grade|leaderboard|streak)\b/i);
-    expect(celebration.title).toContain("memory petal");
+    expect(celebration.title).toContain("A bud opened");
   });
 
   it("demotes living garden when WebGL is unavailable (no blank slot)", () => {

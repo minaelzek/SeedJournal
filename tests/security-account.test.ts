@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type StoredAccount = {
   id: string;
@@ -78,11 +78,20 @@ vi.mock("@/db", () => ({
 
 import { resolveApiAccount } from "../lib/auth/account";
 
+const originalNodeEnv = process.env.NODE_ENV;
+const mutableEnv = process.env as Record<string, string | undefined>;
+
 beforeEach(() => {
+  mutableEnv.NODE_ENV = "development";
   state.currentUser = null;
   state.accounts.clear();
   state.lookups.length = 0;
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  if (originalNodeEnv === undefined) delete mutableEnv.NODE_ENV;
+  else mutableEnv.NODE_ENV = originalNodeEnv;
 });
 
 describe("account identity resolution", () => {

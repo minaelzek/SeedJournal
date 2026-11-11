@@ -16,6 +16,7 @@ vi.mock("vinext/server/image-optimization", () => ({
 }));
 import {
   CSRF_COOKIE,
+  CSRF_COOKIE_DEV,
   CSRF_HEADER,
   ApiRouteError,
   apiJson,
@@ -25,10 +26,11 @@ import {
   withApi,
 } from "../app/api/_shared/http";
 import { applySecurityHeaders } from "../lib/http/security-headers";
+import { isTrustedMutationOrigin } from "../lib/http/request-origin";
 import worker from "../worker/index";
 
 const CONTENT_SECURITY_POLICY =
-  "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://appleid.cdn-apple.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://accounts.google.com https://appleid.apple.com; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self'; worker-src 'self' blob:; frame-src https://accounts.google.com https://appleid.apple.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'";
+  "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://appleid.cdn-apple.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://accounts.google.com https://appleid.apple.com; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self'; worker-src 'self' blob:; frame-src https://accounts.google.com https://appleid.apple.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 describe("API request protections", () => {
   it("accepts a same-origin JSON mutation with a matching CSRF token", async () => {
@@ -46,6 +48,87 @@ describe("API request protections", () => {
       body: "{}",
     });
     await expect(assertSafeMutation(request)).resolves.toBeUndefined();
+  });
+
+  it("does not accept a planted unprefixed CSRF cookie in production", async () => {
+    const mutableEnv = process.env as Record<string, string | undefined>;
+    const previous = process.env.NODE_ENV;
+    mutableEnv.NODE_ENV = "production";
+    try {
+      const issued = issueCsrf(
+        new Request("https://seed.example/api/auth/csrf", {
+          headers: { cookie: `${CSRF_COOKIE_DEV}=${"a".repeat(43)}` },
+        }),
+      );
+      expect(issued.token).not.toBe("a".repeat(43));
+      expect(issued.setCookie).toContain("__Host-seedjournal-csrf=");
+      expect(issued.setCookie).toContain("HttpOnly");
+      expect(issued.setCookie).toContain("Secure");
+      const request = new Request("https://seed.example/api/entries", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          origin: "https://seed.example",
+          "sec-fetch-site": "same-origin",
+          cookie: `${CSRF_COOKIE_DEV}=${issued.token}`,
+          [CSRF_HEADER]: issued.token,
+        },
+        body: "{}",
+      });
+      await expect(assertSafeMutation(request)).rejects.toMatchObject({
+        code: "invalid_csrf",
+        status: 403,
+      });
+    } finally {
+      if (previous === undefined) delete mutableEnv.NODE_ENV;
+      else mutableEnv.NODE_ENV = previous;
+    }
+  });
+
+  it("trusts the workers.dev host that received the request and not a sibling", async () => {
+    const worker = "https://seed-journal.account.workers.dev";
+    const issued = issueCsrf(new Request(`${worker}/api/auth/csrf`));
+    const same = new Request(`${worker}/api/entries`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: worker,
+        "sec-fetch-site": "same-origin",
+        cookie: `${CSRF_COOKIE}=${issued.token}`,
+        [CSRF_HEADER]: issued.token,
+      },
+      body: "{}",
+    });
+    await expect(assertSafeMutation(same)).resolves.toBeUndefined();
+
+    const sibling = new Request(`${worker}/api/entries`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        origin: "https://other-worker.account.workers.dev",
+        "sec-fetch-site": "same-site",
+        cookie: `${CSRF_COOKIE}=${issued.token}`,
+        [CSRF_HEADER]: issued.token,
+      },
+      body: "{}",
+    });
+    await expect(assertSafeMutation(sibling)).rejects.toMatchObject({
+      code: "invalid_origin",
+    });
+    expect(
+      isTrustedMutationOrigin(
+        new URL(`${worker}/api/entries`),
+        "https://journal.example",
+        "https://workers.dev, https://journal.example/path, https://journal.example",
+      ),
+    ).toBe(true);
+    expect(
+      isTrustedMutationOrigin(
+        new URL(`${worker}/api/entries`),
+        "https://evil.workers.dev",
+        "https://workers.dev",
+      ),
+    ).toBe(false);
   });
 
   it("rejects cross-origin and mismatched-token mutations", async () => {
@@ -161,7 +244,10 @@ describe("applySecurityHeaders", () => {
     expect(secured.headers.get("cross-origin-opener-policy")).toBe(
       "same-origin-allow-popups",
     );
-    expect(secured.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(secured.headers.get("x-frame-options")).toBe("DENY");
+    expect(secured.headers.get("cross-origin-resource-policy")).toBe(
+      "same-origin",
+    );
     expect(secured.headers.get("strict-transport-security")).toBe(
       "max-age=15552000; includeSubDomains",
     );
@@ -195,6 +281,24 @@ describe("applySecurityHeaders", () => {
     );
     expect(secured.headers.get("x-content-type-options")).toBe("nosniff");
     expect(secured.headers.get("strict-transport-security")).toBe(
+      "max-age=15552000; includeSubDomains",
+    );
+  });
+
+  it("pins workers.dev without includeSubDomains and a custom domain with it", () => {
+    const workers = applySecurityHeaders(
+      new Response("ok"),
+      new Request("https://seed-journal.account.workers.dev/welcome"),
+    );
+    expect(workers.headers.get("strict-transport-security")).toBe(
+      "max-age=15552000",
+    );
+
+    const custom = applySecurityHeaders(
+      new Response("ok"),
+      new Request("https://journal.example/welcome"),
+    );
+    expect(custom.headers.get("strict-transport-security")).toBe(
       "max-age=15552000; includeSubDomains",
     );
   });
@@ -234,7 +338,7 @@ describe("worker security headers", () => {
     expect(response.headers.get("strict-transport-security")).toBe(
       "max-age=15552000; includeSubDomains",
     );
-    expect(response.headers.get("x-frame-options")).toBe("SAMEORIGIN");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
     expect(response.headers.get("cache-control")).toBe("private, no-store");
   });
 

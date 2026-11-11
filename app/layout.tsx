@@ -42,6 +42,10 @@ export async function generateMetadata(): Promise<Metadata> {
       description: "Nurture what grows within.",
       images: metadataBase ? [new URL("/og.png", metadataBase)] : [],
     },
+    robots: {
+      index: false,
+      follow: false,
+    },
   };
 }
 

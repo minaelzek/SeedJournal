@@ -98,6 +98,11 @@
   letter-spacing: -0.02em;
 }
 
+.sj-welcome__legal {
+  display: flex;
+  gap: 0.9rem;
+}
+
 .sj-welcome__privacy {
   margin-top: 0.35rem;
   color: var(--sj-color-text-muted, var(--color-text-secondary));

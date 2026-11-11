@@ -1,5 +1,7 @@
 {
-  "project_id": "appgprj_6a6a6afb6cd881919dd6c7e54cd1695b",
-  "d1": "DB",
+  "deploy_target": false,
+  "note": "Not the deploy target. Seed Journal deploys to Cloudflare Workers with wrangler.toml. This record only preserves the retired ChatGPT Sites project id.",
+  "historical_chatgpt_sites_project_id": "appgprj_6a6a6afb6cd881919dd6c7e54cd1695b",
+  "d1": null,
   "r2": null
 }

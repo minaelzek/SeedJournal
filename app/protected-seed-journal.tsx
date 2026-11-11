@@ -1,5 +1,7 @@
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SeedJournalApp } from "@/features/app/SeedJournalApp";
+import { devAuthAllowedForHostHeader } from "@/lib/auth/dev-auth";
 import { getRequestPrincipal } from "@/lib/auth/principal";
 
 export async function ProtectedSeedJournal({
@@ -8,7 +10,8 @@ export async function ProtectedSeedJournal({
   initialPath: string;
 }) {
   const principal = await getRequestPrincipal();
-  if (!principal && process.env.NODE_ENV === "production") {
+  const requestHeaders = await headers();
+  if (!principal && !devAuthAllowedForHostHeader(requestHeaders.get("host"))) {
     redirect("/welcome");
   }
 

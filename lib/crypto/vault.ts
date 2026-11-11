@@ -66,6 +66,49 @@ export async function createVault(passphrase: string): Promise<CreatedVault> {
   }
 }
 
+export async function wrapRawKey(
+  rawKeyBase64: string,
+  passphrase: string,
+): Promise<ClientVaultMetadata> {
+  const normalized = normalizePassphrase(passphrase);
+  const rawVaultKey = base64ToBytes(rawKeyBase64);
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const wrapIv = crypto.getRandomValues(new Uint8Array(12));
+  try {
+    if (rawVaultKey.byteLength !== 32) {
+      throw new Error("Invalid vault key.");
+    }
+    const wrappingKey = await deriveWrappingKey(
+      normalized,
+      salt,
+      VAULT_KDF_ITERATIONS,
+    );
+    const wrappedKey = await crypto.subtle.encrypt(
+      {
+        name: "AES-GCM",
+        iv: copyArrayBuffer(wrapIv),
+        additionalData: copyArrayBuffer(VAULT_AAD),
+        tagLength: 128,
+      },
+      wrappingKey,
+      copyArrayBuffer(rawVaultKey),
+    );
+    return {
+      formatVersion: 1,
+      kdf: "PBKDF2-SHA-256",
+      iterations: VAULT_KDF_ITERATIONS,
+      salt: bytesToBase64(salt),
+      wrapAlgorithm: "AES-256-GCM",
+      wrapIv: bytesToBase64(wrapIv),
+      wrappedKey: bytesToBase64(new Uint8Array(wrappedKey)),
+    };
+  } finally {
+    wipeBytes(rawVaultKey);
+    wipeBytes(salt);
+    wipeBytes(wrapIv);
+  }
+}
+
 export async function unlockVault(
   metadata: ClientVaultMetadata,
   passphrase: string,

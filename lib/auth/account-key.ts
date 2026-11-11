@@ -8,47 +8,17 @@ import {
   copyArrayBuffer,
   wipeBytes,
 } from "@/lib/crypto/encoding";
+import { allowDevAuth } from "./dev-auth";
+import { loadMasterWrapKey } from "./wrap-key";
 
 const KEY_AAD = new TextEncoder().encode("SeedJournal|account-key|1");
-const DEV_WRAP_MATERIAL = "seed-journal-dev-wrap-key-do-not-use-in-production";
 
 function workerEnv(): { ACCOUNT_WRAP_KEY?: string } {
   return env as unknown as { ACCOUNT_WRAP_KEY?: string };
 }
 
-async function importAesKey(raw: Uint8Array): Promise<CryptoKey> {
-  return crypto.subtle.importKey(
-    "raw",
-    copyArrayBuffer(raw),
-    { name: "AES-GCM", length: 256 },
-    false,
-    ["encrypt", "decrypt"],
-  );
-}
-
-async function masterWrapKey(): Promise<CryptoKey> {
-  const configured = workerEnv().ACCOUNT_WRAP_KEY?.trim();
-  if (configured) {
-    const raw = base64ToBytes(configured);
-    try {
-      if (raw.byteLength !== 32) {
-        throw new Error("ACCOUNT_WRAP_KEY must be 32 bytes of standard base64.");
-      }
-      return await importAesKey(raw);
-    } finally {
-      wipeBytes(raw);
-    }
-  }
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("ACCOUNT_WRAP_KEY is required in production.");
-  }
-  const material = new TextEncoder().encode(DEV_WRAP_MATERIAL);
-  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", material));
-  try {
-    return await importAesKey(digest);
-  } finally {
-    wipeBytes(digest);
-  }
+function masterWrapKey(): Promise<CryptoKey> {
+  return loadMasterWrapKey(workerEnv().ACCOUNT_WRAP_KEY, allowDevAuth());
 }
 
 export async function ensureAccountDataKey(accountId: string): Promise<string> {

@@ -15,6 +15,7 @@ export const accounts = sqliteTable(
     id: text("id").primaryKey(),
     authSubjectId: text("auth_subject_id").notNull(),
     email: text("email"),
+    emailVerified: integer("email_verified").notNull().default(0),
     displayName: text("display_name"),
     treeSeed: text("tree_seed").notNull(),
     treeAlgorithmVersion: integer("tree_algorithm_version").notNull().default(2),
@@ -24,6 +25,13 @@ export const accounts = sqliteTable(
   (table) => [
     uniqueIndex("accounts_auth_subject_id_unique").on(table.authSubjectId),
     index("accounts_email_idx").on(table.email),
+    uniqueIndex("accounts_verified_email_unique")
+      .on(table.email)
+      .where(sql`${table.emailVerified} = 1`),
+    check(
+      "accounts_email_verified_check",
+      sql`${table.emailVerified} IN (0, 1)`,
+    ),
     check(
       "accounts_tree_algorithm_version_check",
       sql`${table.treeAlgorithmVersion} IN (1, 2)`,

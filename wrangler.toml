@@ -1,13 +1,31 @@
-# Local-only Wrangler config (not ChatGPT Sites).
-# Used for D1 migrations and local Miniflare state under .wrangler/
+# Cloudflare Workers config. Deploy target is this file, not .openai/hosting.json.
+# Production hostname is the workers.dev URL printed by `wrangler deploy`
+# (https://seed-journal.<account-subdomain>.workers.dev). No custom domain yet.
+# Binding name `DB` matches db/index.ts and cloudflare-env.d.ts.
 
+account_id = "7642aefd370cf6a69cd4130786ea06cc"
 name = "seed-journal"
 main = "worker/index.ts"
 compatibility_date = "2026-04-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
+workers_dev = true
+
+# Custom domain, when you have one. Uncomment the route, add that https origin
+# to Google authorized JavaScript origins and the Apple Services ID return URL,
+# and deploy again. workers_dev can stay true until you stop using workers.dev.
+# HSTS includeSubDomains turns on by itself for a hostname outside workers.dev.
+# [[routes]]
+# pattern = "journal.example.com"
+# custom_domain = true
 
 [[d1_databases]]
 binding = "DB"
-database_name = "seed-journal-d1"
-database_id = "00000000-0000-4000-8000-000000000000"
+database_name = "seedjournal"
+database_id = "7dec0e1e-ac67-46ac-9a6a-ad1ab91fae68"
 migrations_dir = "drizzle"
+
+# Leave unset while the only public origin is this Worker's workers.dev host.
+# During a custom-domain cutover, set a comma-separated list of extra https
+# origins that may send credentialed mutations. Do not use a wildcard.
+# [vars]
+# SEED_JOURNAL_ALLOWED_ORIGINS = "https://journal.example.com"

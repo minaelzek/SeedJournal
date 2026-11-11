@@ -13,6 +13,7 @@ const state = vi.hoisted(() => ({
   revoked: [] as string[],
   revokedTokens: [] as string[],
   deleted: 0,
+  sql: [] as string[],
 }));
 
 vi.mock("@/lib/auth/account", () => ({
@@ -46,6 +47,16 @@ vi.mock("@/db", () => ({
       },
     }),
   }),
+  getD1: () => ({
+    prepare: (sql: string) => ({
+      bind: (...args: unknown[]) => ({ sql, args }),
+    }),
+    batch: async (statements: Array<{ sql: string }>) => {
+      state.sql = statements.map((statement) => statement.sql);
+      state.deleted += 1;
+      return statements.map(() => ({ meta: { changes: 1 } }));
+    },
+  }),
 }));
 
 import { DELETE } from "../app/api/account/route";
@@ -58,6 +69,7 @@ beforeEach(() => {
   state.revoked.length = 0;
   state.revokedTokens.length = 0;
   state.deleted = 0;
+  state.sql = [];
 });
 
 afterEach(() => {
@@ -110,10 +122,14 @@ describe("account deletion", () => {
     expect(response.status).toBe(200);
     expect(state.revoked).toEqual(["acct-1"]);
     expect(state.deleted).toBe(1);
+    expect(state.sql.some((sql) => sql.includes("ciphertext = ''"))).toBe(true);
+    expect(state.sql.some((sql) => sql.startsWith("DELETE FROM accounts"))).toBe(
+      true,
+    );
     expect(response.headers.getSetCookie()).toEqual([
       "__Host-seedjournal-session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure",
       "seedjournal-session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0",
-      "seedjournal-csrf=; Path=/; SameSite=Strict; Max-Age=0",
+      "seedjournal-csrf=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0",
     ]);
   });
 
@@ -134,7 +150,7 @@ describe("account deletion", () => {
     expect(response.headers.getSetCookie()).toEqual([
       "__Host-seedjournal-session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure",
       "seedjournal-session=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0; Secure",
-      "__Host-seedjournal-csrf=; Path=/; SameSite=Strict; Max-Age=0; Secure",
+      "__Host-seedjournal-csrf=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0; Secure",
     ]);
   });
 });

@@ -438,6 +438,13 @@
   margin: 0 0 0.75rem;
 }
 
+.sj-settings__confirm label {
+  display: grid;
+  gap: 0.4rem;
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+
 .sj-settings__confirm-actions {
   display: flex;
   flex-wrap: wrap;

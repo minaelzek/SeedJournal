@@ -1,9 +1,17 @@
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from "jose";
 import { env } from "cloudflare:workers";
-import type { SocialProvider, VerifiedSocialIdentity } from "./social-identity";
+import {
+  isVerifiedEmailClaim,
+  type SocialProvider,
+  type VerifiedSocialIdentity,
+} from "./social-identity";
 
 export type { SocialProvider, VerifiedSocialIdentity } from "./social-identity";
-export { isSocialProvider, socialSubjectId } from "./social-identity";
+export {
+  isSocialProvider,
+  isVerifiedEmailClaim,
+  socialSubjectId,
+} from "./social-identity";
 
 export class SocialAuthError extends Error {
   constructor(message = "The sign-in token could not be verified.") {
@@ -73,7 +81,7 @@ async function verifyGoogleIdToken(
     throw new SocialAuthError("The Google sign-in token is invalid.");
   }
   const email = typeof payload.email === "string" ? payload.email.trim() : "";
-  const emailVerified = payload.email_verified === true;
+  const emailVerified = isVerifiedEmailClaim(payload.email_verified);
   const displayName =
     typeof payload.name === "string" ? payload.name.trim() : "";
   return {
@@ -106,8 +114,7 @@ async function verifyAppleIdToken(
     throw new SocialAuthError("The Apple sign-in token is invalid.");
   }
   const email = typeof payload.email === "string" ? payload.email.trim() : "";
-  const emailVerified =
-    payload.email_verified === true || payload.email_verified === "true";
+  const emailVerified = isVerifiedEmailClaim(payload.email_verified);
   return {
     provider: "apple",
     subject: payload.sub.trim(),

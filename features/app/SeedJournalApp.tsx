@@ -45,6 +45,7 @@ import {
   decryptEntryPayload,
   encryptEntryPayload,
   importVaultKeyFromBase64,
+  wrapRawKey,
   type ClientVaultMetadata,
 } from "@/lib/crypto";
 import {
@@ -1277,12 +1278,14 @@ export function SeedJournalApp({
 
   const memories = useMemo<GardenMemoryRecord[]>(() => {
     const byId = new Map(entries.map((entry) => [entry.id, entry]));
-    let journalOrdinal = 0;
-    return displayedGrowthEvents.flatMap((event) => {
-      if (!event.entryId || !event.kind.startsWith("memory_")) return [];
-      const entry = byId.get(event.entryId);
+    const visible = displayedGrowthEvents.filter((event) => {
+      if (!event.entryId || !event.kind.startsWith("memory_")) return false;
+      return byId.has(event.entryId);
+    });
+    return visible.flatMap((event, index) => {
+      const entry = event.entryId ? byId.get(event.entryId) : undefined;
       if (!entry) return [];
-      journalOrdinal += 1;
+      const journalOrdinal = index + 1;
       const form = event.kind.replace("memory_", "").replaceAll("_", "-") as
         | "leaf"
         | "bud"
@@ -1530,6 +1533,7 @@ export function SeedJournalApp({
           displayName
         }
         vault={vault ?? sessionVaultStub(bootstrap)}
+        dataKey={bootstrap.dataKey}
         envelopes={envelopes}
         entries={entries}
         growthEvents={growthEvents}
@@ -1694,6 +1698,7 @@ function sessionVaultStub(_bootstrap: BootstrapResponse): StoredVault {
 function SettingsScreen({
   displayName,
   vault,
+  dataKey,
   envelopes,
   entries,
   growthEvents,
@@ -1705,6 +1710,7 @@ function SettingsScreen({
 }: {
   displayName: string;
   vault: StoredVault;
+  dataKey?: string;
   envelopes: EncryptedEntryEnvelope[];
   entries: DecryptedJournalEntry[];
   growthEvents: TreeGrowthEvent[];
@@ -1716,6 +1722,11 @@ function SettingsScreen({
 }) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmReadable, setConfirmReadable] = useState(false);
+  const [confirmEncrypted, setConfirmEncrypted] = useState(false);
+  const [exportPassphrase, setExportPassphrase] = useState("");
+  const [exportConfirm, setExportConfirm] = useState("");
+  const [exportError, setExportError] = useState<string>();
+  const [preparingExport, setPreparingExport] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string>();
   const [gentleCareNote, setGentleCareNote] = useState(false);
@@ -1781,25 +1792,19 @@ function SettingsScreen({
             <button
               className="sj-settings__choice"
               type="button"
-              onClick={() =>
-                download(
-                  buildEncryptedArchive({
-                    tree: {
-                      rootSeed,
-                      algorithmVersion: treeAlgorithmVersion,
-                    },
-                    vault,
-                    entries: envelopes,
-                    growthEvents,
-                  }),
-                  "seed-journal-backup.seedjournal",
-                )
-              }
+              aria-expanded={confirmEncrypted}
+              onClick={() => {
+                setExportError(undefined);
+                setConfirmEncrypted(true);
+              }}
             >
               <DownloadSimple aria-hidden />
               <span>
                 <strong>Encrypted backup</strong>
-                <small>For safekeeping. This garden cannot open it again.</small>
+                <small>
+                  Locked with a passphrase you choose. This garden does not
+                  keep it.
+                </small>
               </span>
             </button>
             <button
@@ -1815,6 +1820,114 @@ function SettingsScreen({
               </span>
             </button>
           </div>
+          {confirmEncrypted ? (
+            <form
+              className="sj-settings__confirm"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (preparingExport) return;
+                if (dataKey && exportPassphrase !== exportConfirm) {
+                  setExportError("Those passphrases do not match.");
+                  return;
+                }
+                setPreparingExport(true);
+                setExportError(undefined);
+                void (async () => {
+                  try {
+                    const exportVault = dataKey
+                      ? {
+                          ...(await wrapRawKey(dataKey, exportPassphrase)),
+                          revision: vault.revision,
+                          updatedAt: Date.now(),
+                        }
+                      : vault;
+                    download(
+                      buildEncryptedArchive({
+                        tree: {
+                          rootSeed,
+                          algorithmVersion: treeAlgorithmVersion,
+                        },
+                        vault: exportVault,
+                        entries: envelopes,
+                        growthEvents,
+                      }),
+                      "seed-journal-backup.seedjournal",
+                    );
+                    setExportPassphrase("");
+                    setExportConfirm("");
+                    setConfirmEncrypted(false);
+                  } catch (caught) {
+                    setExportError(
+                      caught instanceof Error
+                        ? caught.message
+                        : "The encrypted copy could not be prepared.",
+                    );
+                  } finally {
+                    setPreparingExport(false);
+                  }
+                })();
+              }}
+            >
+              <p>
+                {dataKey
+                  ? "Choose a passphrase for this file. The writing stays encrypted with the same key as the garden. The passphrase wraps that key so the file can be opened later. Seed Journal does not store the passphrase and cannot import the file back."
+                  : "This copy uses the vault already stored for the account. Seed Journal cannot import the file back."}
+              </p>
+              {dataKey ? (
+                <div className="sj-settings__fields">
+                  <label>
+                    Passphrase
+                    <input
+                      type="password"
+                      name="export-passphrase"
+                      autoComplete="new-password"
+                      value={exportPassphrase}
+                      onChange={(event) =>
+                        setExportPassphrase(event.target.value)
+                      }
+                      required
+                      minLength={12}
+                    />
+                  </label>
+                  <label>
+                    Repeat passphrase
+                    <input
+                      type="password"
+                      name="export-passphrase-confirm"
+                      autoComplete="new-password"
+                      value={exportConfirm}
+                      onChange={(event) => setExportConfirm(event.target.value)}
+                      required
+                      minLength={12}
+                    />
+                  </label>
+                </div>
+              ) : null}
+              {exportError ? <p role="alert">{exportError}</p> : null}
+              <div className="sj-settings__confirm-actions">
+                <button
+                  className="sj-settings__button"
+                  type="submit"
+                  disabled={preparingExport}
+                >
+                  {preparingExport ? "Preparing the copy…" : "Download the encrypted copy"}
+                </button>
+                <button
+                  className="sj-settings__quiet"
+                  type="button"
+                  disabled={preparingExport}
+                  onClick={() => {
+                    setConfirmEncrypted(false);
+                    setExportPassphrase("");
+                    setExportConfirm("");
+                    setExportError(undefined);
+                  }}
+                >
+                  Keep it here
+                </button>
+              </div>
+            </form>
+          ) : null}
           {confirmReadable ? (
             <div className="sj-settings__confirm" role="group" aria-label="Download readable pages">
               <p>

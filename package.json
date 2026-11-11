@@ -6,6 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "predev": "npm run db:migrate",
     "dev": "cross-env WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext dev --hostname 127.0.0.1",
     "build": "cross-env WRANGLER_LOG_PATH=.wrangler/wrangler.log vinext build",
     "start": "cross-env WRANGLER_LOG_PATH=.wrangler/wrangler.log wrangler dev --config dist/server/wrangler.json --local --persist-to .wrangler/state",
@@ -19,6 +20,7 @@
     "still-pack:living-sakura": "playwright test tests/e2e/living-sakura-still-pack.mjs",
     "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run test:integration && npm run build && npm audit --omit=dev --audit-level=high",
     "verify:staging": "npm run test:e2e && wrangler deploy --dry-run --config dist/server/wrangler.json",
+    "db:migrate": "wrangler d1 migrations apply seedjournal --local --persist-to .wrangler/state",
     "db:reset": "node scripts/reset-local-db.mjs",
     "db:generate": "drizzle-kit generate"
   },
@@ -32,12 +34,12 @@
     "cross-env": "^10.1.0",
     "drizzle-orm": "0.45.2",
     "jose": "^6.2.8",
-    "next": "16.3.0",
+    "next": "16.4.6",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "tailwind-merge": "^3.6.0",
     "three": "^0.185.1",
-    "zod": "^4.4.3"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
@@ -65,5 +67,9 @@
     "vitest": "^4.1.10",
     "wrangler": "4.92.0"
   },
-  "type": "module"
+  "type": "module",
+  "overrides": {
+    "nanoid": "3.3.20",
+    "source-map-js": "1.2.2"
+  }
 }

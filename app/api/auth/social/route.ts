@@ -23,6 +23,13 @@ export const POST = withApi(async (request: Request) => {
   const provider =
     typeof body.provider === "string" ? body.provider.trim().toLowerCase() : "";
   const idToken = typeof body.idToken === "string" ? body.idToken.trim() : "";
+  if (idToken.length > 8192) {
+    throw new ApiRouteError(
+      413,
+      "payload_too_large",
+      "The sign-in token is too large.",
+    );
+  }
   if (!isSocialProvider(provider) || !idToken) {
     throw new ApiRouteError(
       400,

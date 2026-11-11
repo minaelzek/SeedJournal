@@ -7,6 +7,7 @@ export {
 export {
   createVault,
   importVaultKeyFromBase64,
+  wrapRawKey,
   MINIMUM_PASSPHRASE_LENGTH,
   normalizePassphrase,
   rewrapVault,

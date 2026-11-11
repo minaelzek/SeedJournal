@@ -3,11 +3,12 @@ import { access, readFile } from "node:fs/promises";
 import test from "node:test";
 
 test("ships Seed Journal product metadata and protected routes", async () => {
-  const [page, layout, packageJson, hosting] = await Promise.all([
+  const [page, layout, packageJson, hosting, wrangler] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
     readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
+    readFile(new URL("../wrangler.toml", import.meta.url), "utf8"),
   ]);
 
   assert.match(page, /ProtectedSeedJournal/);
@@ -17,7 +18,14 @@ test("ships Seed Journal product metadata and protected routes", async () => {
   assert.doesNotMatch(page, /SkeletonPreview|codex-preview/);
   assert.doesNotMatch(layout, /Starter Project|codex-preview/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
-  assert.equal(JSON.parse(hosting).d1, "DB");
+  const hostingRecord = JSON.parse(hosting);
+  assert.equal(hostingRecord.deploy_target, false);
+  assert.equal(hostingRecord.d1, null);
+  assert.match(wrangler, /binding = "DB"/);
+  assert.match(
+    wrangler,
+    /database_id = "7dec0e1e-ac67-46ac-9a6a-ad1ab91fae68"/,
+  );
 });
 
 test("includes privacy, reflection, and garden production surfaces", async () => {

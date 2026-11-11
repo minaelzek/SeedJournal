@@ -1,6 +1,9 @@
 export const SESSION_COOKIE_PROD = "__Host-seedjournal-session";
 export const SESSION_COOKIE_DEV = "seedjournal-session";
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+// The browser also locks after 15 quiet minutes when logout succeeds.
+// This is the server-side idle limit for a cookie whose logout request never landed.
+export const SESSION_IDLE_MS = 12 * 60 * 60 * 1000;
 
 export function sessionCookieName(): string {
   return process.env.NODE_ENV === "production"
