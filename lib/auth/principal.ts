@@ -1,5 +1,6 @@
 import { cookies, headers } from "next/headers";
 import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { allowDevAuth } from "./dev-auth";
 import {
   readSessionTokenFromRequest,
   SESSION_COOKIE_DEV,
@@ -28,7 +29,7 @@ export async function getRequestPrincipal(): Promise<RequestPrincipal | null> {
   }
 
   const chatgpt = await getChatGPTUser();
-  if (chatgpt && process.env.NODE_ENV !== "production") {
+  if (chatgpt && allowDevAuth()) {
     return {
       kind: "legacy",
       provider: chatgpt.subjectId.startsWith("local-") ? "local" : "chatgpt",

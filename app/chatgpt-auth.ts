@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { devAuthAllowedForHostHeader } from "@/lib/auth/dev-auth";
 
 export type ChatGPTUser = {
   subjectId: string;
@@ -20,16 +21,16 @@ const CALLBACK_PATH = "/callback";
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
+  if (!devAuthAllowedForHostHeader(requestHeaders.get("host"))) {
+    return null;
+  }
   const subjectId = requestHeaders.get(USER_ID_HEADER)?.trim();
   if (!subjectId) {
-    if (process.env.NODE_ENV === "development") {
-      return {
-        subjectId: LOCAL_PREVIEW_SUBJECT_ID,
-        displayName: "Local gardener",
-        email: "local-preview@seedjournal.invalid",
-      };
-    }
-    return null;
+    return {
+      subjectId: LOCAL_PREVIEW_SUBJECT_ID,
+      displayName: "Local gardener",
+      email: "local-preview@seedjournal.invalid",
+    };
   }
 
   const email = requestHeaders.get(USER_EMAIL_HEADER)?.trim() || undefined;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 interface AuthProviders {
   google: { enabled: boolean; clientId?: string };
@@ -68,6 +68,33 @@ export function WelcomeSignIn() {
       });
   }, []);
 
+  const completeSocial = useCallback(
+    async (provider: "google" | "apple", idToken: string) => {
+      setPending(true);
+      setError(undefined);
+      try {
+        const token = await ensureCsrf();
+        const response = await fetch("/api/auth/social", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "content-type": "application/json",
+            "x-seedjournal-csrf": token,
+          },
+          body: JSON.stringify({ provider, idToken }),
+        });
+        if (!response.ok) {
+          throw new Error("sign-in");
+        }
+        window.location.assign("/?arrive=1");
+      } catch {
+        setError("The garden could not open that sign-in. Please try again.");
+        setPending(false);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!providers?.google.enabled || !providers.google.clientId) return;
     const clientId = providers.google.clientId;
@@ -98,31 +125,7 @@ export function WelcomeSignIn() {
     return () => {
       script.remove();
     };
-  }, [providers]);
-
-  const completeSocial = async (provider: "google" | "apple", idToken: string) => {
-    setPending(true);
-    setError(undefined);
-    try {
-      const token = await ensureCsrf();
-      const response = await fetch("/api/auth/social", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: {
-          "content-type": "application/json",
-          "x-seedjournal-csrf": token,
-        },
-        body: JSON.stringify({ provider, idToken }),
-      });
-      if (!response.ok) {
-        throw new Error("sign-in");
-      }
-      window.location.assign("/?arrive=1");
-    } catch {
-      setError("The garden could not open that sign-in. Please try again.");
-      setPending(false);
-    }
-  };
+  }, [completeSocial, providers]);
 
   const continueLocal = async () => {
     setPending(true);

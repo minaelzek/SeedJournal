@@ -112,10 +112,8 @@ export function issueCsrf(request: Request): {
   token: string;
   setCookie: string | null;
 } {
-  const header = request.headers.get("cookie");
-  const current =
-    readCookie(header, CSRF_COOKIE) ?? readCookie(header, CSRF_COOKIE_DEV);
-  if (current && isCsrfToken(current)) {
+  const current = readAcceptedCsrfCookie(request.headers.get("cookie"));
+  if (current) {
     return { token: current, setCookie: null };
   }
   const token = randomBase64Url(32);
@@ -123,6 +121,7 @@ export function issueCsrf(request: Request): {
   const parts = [
     `${csrfCookieName()}=${token}`,
     "Path=/",
+    "HttpOnly",
     "SameSite=Strict",
     "Max-Age=43200",
   ];
@@ -162,10 +161,7 @@ export async function assertSafeMutation(request: Request): Promise<void> {
     );
   }
 
-  const cookieHeader = request.headers.get("cookie");
-  const cookieToken =
-    readCookie(cookieHeader, CSRF_COOKIE) ??
-    readCookie(cookieHeader, CSRF_COOKIE_DEV);
+  const cookieToken = readAcceptedCsrfCookie(request.headers.get("cookie"));
   const headerToken = request.headers.get(CSRF_HEADER);
   if (
     !cookieToken ||
@@ -287,6 +283,17 @@ function readCookie(header: string | null, name: string): string | null {
     const key = part.slice(0, separator).trim();
     if (key === name) return part.slice(separator + 1).trim();
   }
+  return null;
+}
+
+function readAcceptedCsrfCookie(header: string | null): string | null {
+  const host = readCookie(header, CSRF_COOKIE);
+  if (host && isCsrfToken(host)) return host;
+  // The unprefixed cookie can be planted by a sibling host. Production
+  // accepts only the __Host- cookie, matching the session cookie rule.
+  if (process.env.NODE_ENV === "production") return null;
+  const dev = readCookie(header, CSRF_COOKIE_DEV);
+  if (dev && isCsrfToken(dev)) return dev;
   return null;
 }
 

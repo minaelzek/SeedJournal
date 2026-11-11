@@ -6,6 +6,7 @@ export const metadata: Metadata = {
   title: "Privacy",
   description:
     "What Seed Journal encrypts, what a signed-in session can open, and what an export cannot do.",
+  robots: { index: true, follow: true },
 };
 
 export default function PrivacyPage() {
@@ -13,6 +14,8 @@ export default function PrivacyPage() {
     <main className="sj-privacy" id="main-content">
       <nav className="sj-privacy__nav" aria-label="Privacy">
         <Link href="/welcome">Seed Journal</Link>
+        {" · "}
+        <Link href="/terms">Terms</Link>
       </nav>
       <article>
         <p className="sj-privacy__eyebrow">A private garden</p>
@@ -69,9 +72,11 @@ export default function PrivacyPage() {
         <section>
           <h2>What an export cannot do</h2>
           <p>
-            An encrypted backup is a file for safekeeping. This garden cannot
-            open it or import it back. A readable download is plain text.
-            Anyone who receives that file can read every word. Treat it as a
+            An encrypted copy is locked with a passphrase you choose at
+            download time. This garden does not keep that passphrase, and it
+            cannot import the file back. Without the passphrase, the file is
+            only ciphertext. A readable download is plain text. Anyone who
+            receives that file can read every word. Treat either file as a
             paper journal that has left the desk.
           </p>
         </section>

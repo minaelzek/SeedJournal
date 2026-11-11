@@ -6,7 +6,9 @@ import {
   encryptEntryPayload,
   rewrapVault,
   unlockVault,
+  wrapRawKey,
 } from "../lib/crypto";
+import { bytesToBase64 } from "../lib/crypto/encoding";
 
 const PASSPHRASE = "moonlit-garden-passphrase";
 const ACCOUNT_ID = "607e2179-6007-4ec8-863d-0fae83c07b24";
@@ -102,6 +104,30 @@ describe("Seed Journal vault encryption", () => {
         revision: 2,
       }),
     ).rejects.toThrow("could not be decrypted");
+  });
+
+  it("wraps an existing account key for an offline export", async () => {
+    const raw = crypto.getRandomValues(new Uint8Array(32));
+    const metadata = await wrapRawKey(bytesToBase64(raw), PASSPHRASE);
+    const unlocked = await unlockVault(metadata, PASSPHRASE);
+    const envelope = await encryptEntryPayload(
+      unlocked,
+      ACCOUNT_ID,
+      payload,
+      {
+        id: ENTRY_ID,
+        state: "draft",
+        revision: 1,
+        clientCreatedAt: 1,
+        clientUpdatedAt: 1,
+      },
+    );
+    await expect(
+      decryptEntryPayload(unlocked, ACCOUNT_ID, envelope),
+    ).resolves.toEqual(payload);
+    await expect(
+      unlockVault(metadata, "this-is-not-the-passphrase"),
+    ).rejects.toThrow("incorrect");
   });
 
   it("rewraps the same vault under a new passphrase", async () => {

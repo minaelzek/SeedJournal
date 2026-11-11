@@ -9,10 +9,10 @@ import {
 } from "@/db/schema";
 import { AuthenticationRequiredError } from "./errors";
 import { getRequestPrincipal } from "./principal";
+import { verifiedAccountEmail } from "./profile-email";
 import { resolveSessionAccountId } from "./session";
 import {
   socialSubjectId,
-  type SocialProvider,
   type VerifiedSocialIdentity,
 } from "./social-identity";
 
@@ -50,6 +50,7 @@ export async function upsertAccountBySubject(input: {
   authSubjectId: string;
   email?: string;
   displayName?: string;
+  emailVerified?: boolean;
 }): Promise<Account> {
   const authSubjectId = input.authSubjectId.trim();
   if (!authSubjectId || authSubjectId.length > 256) {
@@ -76,11 +77,20 @@ export async function upsertAccountBySubject(input: {
   if (existing) {
     const profileUpdate: {
       email?: string | null;
+      emailVerified?: number;
       displayName?: string | null;
       updatedAt?: number;
     } = {};
     if (email !== undefined && email !== existing.email) {
       profileUpdate.email = email || null;
+      profileUpdate.emailVerified = input.emailVerified && email ? 1 : 0;
+    } else if (
+      input.emailVerified &&
+      email &&
+      email === existing.email &&
+      existing.emailVerified !== 1
+    ) {
+      profileUpdate.emailVerified = 1;
     }
     if (displayName !== undefined && displayName !== existing.displayName) {
       profileUpdate.displayName = displayName || null;
@@ -104,6 +114,7 @@ export async function upsertAccountBySubject(input: {
       id: crypto.randomUUID(),
       authSubjectId,
       email: email ?? null,
+      emailVerified: input.emailVerified && email ? 1 : 0,
       displayName: displayName || null,
       treeSeed: randomTreeSeed(),
       createdAt: now,
@@ -139,17 +150,14 @@ export async function resolveSocialAccount(
     return mergeAccountProfile(account, identity);
   }
 
-  const verifiedEmail =
-    identity.email && identity.emailVerified
-      ? normalizeProfileEmail(identity.email)
-      : undefined;
+  const verifiedEmail = verifiedAccountEmail(
+    identity.email,
+    identity.emailVerified,
+  );
   if (verifiedEmail) {
-    const byEmail = await db.query.accounts.findFirst({
-      where: eq(accounts.email, verifiedEmail),
-    });
+    const byEmail = await findVerifiedEmailAccount(verifiedEmail);
     if (byEmail) {
-      await attachSocialAccount(byEmail.id, identity);
-      return mergeAccountProfile(byEmail, identity);
+      return bindSocialIdentity(byEmail, identity);
     }
   }
 
@@ -157,13 +165,70 @@ export async function resolveSocialAccount(
     throw new AuthenticationRequiredError();
   }
 
-  const account = await upsertAccountBySubject({
-    authSubjectId: socialSubjectId(identity.provider, identity.subject),
-    email: identity.email,
-    displayName: identity.displayName,
+  let account: Account;
+  try {
+    account = await upsertAccountBySubject({
+      authSubjectId: socialSubjectId(identity.provider, identity.subject),
+      email: verifiedEmail,
+      displayName: identity.displayName,
+      emailVerified: true,
+    });
+  } catch (error) {
+    if (!isVerifiedEmailConflict(error)) throw error;
+    const existing = await findVerifiedEmailAccount(verifiedEmail);
+    if (!existing) throw error;
+    account = existing;
+  }
+  return bindSocialIdentity(account, identity);
+}
+
+async function findVerifiedEmailAccount(
+  email: string,
+): Promise<Account | undefined> {
+  const db = getDb();
+  return db.query.accounts.findFirst({
+    where: and(eq(accounts.email, email), eq(accounts.emailVerified, 1)),
   });
+}
+
+async function bindSocialIdentity(
+  account: Account,
+  identity: VerifiedSocialIdentity,
+): Promise<Account> {
   await attachSocialAccount(account.id, identity);
-  return account;
+  const db = getDb();
+  const linked = await db.query.socialAccounts.findFirst({
+    where: and(
+      eq(socialAccounts.provider, identity.provider),
+      eq(socialAccounts.providerUserId, identity.subject),
+    ),
+  });
+  if (!linked) throw new AuthenticationRequiredError();
+  if (linked.accountId === account.id) {
+    return mergeAccountProfile(account, identity);
+  }
+  const owner = await db.query.accounts.findFirst({
+    where: eq(accounts.id, linked.accountId),
+  });
+  if (!owner) throw new AuthenticationRequiredError();
+  return mergeAccountProfile(owner, identity);
+}
+
+function isVerifiedEmailConflict(error: unknown): boolean {
+  const message = errorText(error);
+  return (
+    message.includes("accounts_verified_email_unique") ||
+    message.includes("UNIQUE constraint failed: accounts.email")
+  );
+}
+
+function errorText(error: unknown): string {
+  if (!error) return "";
+  if (error instanceof Error) {
+    const cause = (error as { cause?: unknown }).cause;
+    return `${error.message}\n${errorText(cause)}`;
+  }
+  return String(error);
 }
 
 async function attachSocialAccount(
@@ -208,9 +273,13 @@ async function mergeAccountProfile(
   account: Account,
   identity: VerifiedSocialIdentity,
 ): Promise<Account> {
+  const verifiedEmail = verifiedAccountEmail(
+    identity.email,
+    identity.emailVerified,
+  );
   return upsertAccountBySubject({
     authSubjectId: account.authSubjectId,
-    email: identity.email ?? account.email ?? undefined,
+    ...(verifiedEmail ? { email: verifiedEmail, emailVerified: true } : {}),
     displayName: identity.displayName ?? account.displayName ?? undefined,
   });
 }

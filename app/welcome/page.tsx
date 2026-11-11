@@ -5,6 +5,7 @@ import "./welcome.css";
 
 export const metadata = {
   title: "Welcome",
+  robots: { index: true, follow: true },
 };
 
 export default function WelcomePage() {
@@ -16,9 +17,14 @@ export default function WelcomePage() {
       </div>
       <nav className="sj-welcome__nav" aria-label="Welcome">
         <span className="sj-welcome__wordmark">Seed Journal</span>
-        <Link className="sj-welcome__privacy" href="/privacy">
-          Privacy
-        </Link>
+        <span className="sj-welcome__legal">
+          <Link className="sj-welcome__privacy" href="/privacy">
+            Privacy
+          </Link>
+          <Link className="sj-welcome__privacy" href="/terms">
+            Terms
+          </Link>
+        </span>
       </nav>
       <section className="sj-welcome__hero" aria-labelledby="sj-welcome-title">
         <h1 id="sj-welcome-title">A seed is waiting.</h1>

@@ -1,7 +1,8 @@
+import { devAuthAllowedForRequest } from "@/lib/auth/dev-auth";
 import { appleClientId, googleClientId } from "@/lib/auth/social";
 import { apiJson, withApi } from "../../_shared/http";
 
-export const GET = withApi(async () => {
+export const GET = withApi(async (request: Request) => {
   const google = googleClientId();
   const apple = appleClientId();
   return apiJson({
@@ -11,6 +12,6 @@ export const GET = withApi(async () => {
     apple: apple
       ? { enabled: true, clientId: apple }
       : { enabled: false },
-    localGarden: process.env.NODE_ENV !== "production",
+    localGarden: devAuthAllowedForRequest(request),
   });
 });

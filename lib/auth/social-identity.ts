@@ -8,6 +8,8 @@ export interface VerifiedSocialIdentity {
   displayName?: string;
 }
 
+export { isVerifiedEmailClaim } from "./profile-email";
+
 export function isSocialProvider(value: string): value is SocialProvider {
   return value === "google" || value === "apple";
 }

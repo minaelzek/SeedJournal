@@ -22,6 +22,13 @@
       "when": 1786728109661,
       "tag": "0002_pink_maximus",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794428788567,
+      "tag": "0003_harden_accounts",
+      "breakpoints": true
     }
   ]
 }

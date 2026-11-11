@@ -1,4 +1,5 @@
 import { upsertAccountBySubject } from "@/lib/auth/account";
+import { devAuthAllowedForRequest } from "@/lib/auth/dev-auth";
 import { ensureAccountDataKey } from "@/lib/auth/account-key";
 import { LOCAL_PREVIEW_SUBJECT_ID } from "@/app/chatgpt-auth";
 import {
@@ -14,7 +15,7 @@ import {
 
 export const POST = withApi(async (request: Request) => {
   await assertSafeMutation(request);
-  if (process.env.NODE_ENV === "production") {
+  if (!devAuthAllowedForRequest(request)) {
     throw new ApiRouteError(
       404,
       "not_found",

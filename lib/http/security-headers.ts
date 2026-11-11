@@ -4,7 +4,7 @@
 // the Google button require it. Do not widen script-src.
 
 export const CONTENT_SECURITY_POLICY =
-  "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://appleid.cdn-apple.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://accounts.google.com https://appleid.apple.com; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self'; worker-src 'self' blob:; frame-src https://accounts.google.com https://appleid.apple.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'self'";
+  "default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://appleid.cdn-apple.com; style-src 'self' 'unsafe-inline' https://accounts.google.com; connect-src 'self' https://accounts.google.com https://appleid.apple.com; img-src 'self' data: blob: https://*.googleusercontent.com; font-src 'self'; worker-src 'self' blob:; frame-src https://accounts.google.com https://appleid.apple.com; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'";
 
 export const STRICT_TRANSPORT_SECURITY = "max-age=15552000; includeSubDomains";
 
@@ -18,7 +18,8 @@ export const SECURITY_HEADERS: ReadonlyArray<{ key: string; value: string }> = [
   },
   // same-origin-allow-popups keeps Google and Apple sign-in popups working.
   { key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" },
-  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "X-Frame-Options", value: "DENY" },
+  { key: "Cross-Origin-Resource-Policy", value: "same-origin" },
 ];
 
 export function applySecurityHeaders(

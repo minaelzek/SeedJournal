@@ -37,7 +37,7 @@ describe("ChatGPT authenticated principal", () => {
 
   it("uses the same deterministic subject ID for local preview", async () => {
     mutableEnv.NODE_ENV = "development";
-    headersMock.mockResolvedValue(new Headers());
+    headersMock.mockResolvedValue(new Headers({ host: "127.0.0.1:3000" }));
 
     await expect(getChatGPTUser()).resolves.toMatchObject({
       subjectId: LOCAL_PREVIEW_SUBJECT_ID,
@@ -48,10 +48,11 @@ describe("ChatGPT authenticated principal", () => {
     });
   });
 
-  it("reads subject ID and optional profile headers", async () => {
-    mutableEnv.NODE_ENV = "production";
+  it("reads subject ID and optional profile headers only on loopback during development", async () => {
+    mutableEnv.NODE_ENV = "development";
     headersMock.mockResolvedValue(
       new Headers({
+        host: "localhost:3000",
         "oai-authenticated-user-id": " subject-123 ",
         "oai-authenticated-user-email": "gardener@example.com",
         "oai-authenticated-user-full-name": "Mina%20Gardener",
@@ -64,5 +65,29 @@ describe("ChatGPT authenticated principal", () => {
       email: "gardener@example.com",
       displayName: "Mina Gardener",
     });
+  });
+
+  it("ignores identity headers in production, on a public host, and when NODE_ENV is unset", async () => {
+    const headers = new Headers({
+      host: "127.0.0.1:3000",
+      "oai-authenticated-user-id": "subject-123",
+      "oai-authenticated-user-email": "gardener@example.com",
+    });
+    mutableEnv.NODE_ENV = "production";
+    headersMock.mockResolvedValue(headers);
+    await expect(getChatGPTUser()).resolves.toBeNull();
+
+    mutableEnv.NODE_ENV = "development";
+    headersMock.mockResolvedValue(
+      new Headers({
+        host: "seed.example",
+        "oai-authenticated-user-id": "subject-123",
+      }),
+    );
+    await expect(getChatGPTUser()).resolves.toBeNull();
+
+    delete mutableEnv.NODE_ENV;
+    headersMock.mockResolvedValue(headers);
+    await expect(getChatGPTUser()).resolves.toBeNull();
   });
 });
