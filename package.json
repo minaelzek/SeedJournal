@@ -20,7 +20,7 @@
     "still-pack:living-sakura": "playwright test tests/e2e/living-sakura-still-pack.mjs",
     "verify": "npm run lint && npm run typecheck && npm run test:unit && npm run test:integration && npm run build && npm audit --omit=dev --audit-level=high",
     "verify:staging": "npm run test:e2e && wrangler deploy --dry-run --config dist/server/wrangler.json",
-    "db:migrate": "wrangler d1 migrations apply seed-journal-d1 --local --persist-to .wrangler/state",
+    "db:migrate": "wrangler d1 migrations apply seedjournal --local --persist-to .wrangler/state",
     "db:reset": "node scripts/reset-local-db.mjs",
     "db:generate": "drizzle-kit generate"
   },

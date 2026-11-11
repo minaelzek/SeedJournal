@@ -1,5 +1,7 @@
-# Local-only Wrangler config (not ChatGPT Sites).
-# Used for D1 migrations and local Miniflare state under .wrangler/
+# Cloudflare Workers config. Deploy target is this file, not .openai/hosting.json.
+# Binding name `DB` matches db/index.ts and cloudflare-env.d.ts.
+# `database_name` is the D1 name used by `wrangler d1` commands.
+# `database_id` is the production database in account 7642aefd370cf6a69cd4130786ea06cc.
 
 name = "seed-journal"
 main = "worker/index.ts"
@@ -8,6 +10,6 @@ compatibility_flags = ["nodejs_compat"]
 
 [[d1_databases]]
 binding = "DB"
-database_name = "seed-journal-d1"
-database_id = "00000000-0000-4000-8000-000000000000"
+database_name = "seedjournal"
+database_id = "7dec0e1e-ac67-46ac-9a6a-ad1ab91fae68"
 migrations_dir = "drizzle"

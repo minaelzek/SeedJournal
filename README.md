@@ -51,4 +51,31 @@ Generate a migration after changing `db/schema.ts`:
 npm run db:generate
 ```
 
-Checked-in SQL lives in `drizzle/`. Wrangler uses a placeholder D1 id in `wrangler.toml` for local Miniflare. Do not commit `.dev.vars`, `.wrangler/`, or still-pack PNGs.
+Checked-in SQL lives in `drizzle/`. Do not commit `.dev.vars`, `.wrangler/`, or still-pack PNGs.
+
+## Deploy (Cloudflare Workers)
+
+The deploy target is Cloudflare Workers plus the D1 database `seedjournal`
+(`7dec0e1e-ac67-46ac-9a6a-ad1ab91fae68`) in account
+`7642aefd370cf6a69cd4130786ea06cc`. The binding name is `DB`.
+`.openai/hosting.json` is a retired ChatGPT Sites record and is not deployed.
+
+This repo does not deploy itself. From a machine that is logged in with
+Wrangler:
+
+```bash
+npm run build
+npx wrangler d1 migrations apply seedjournal --remote
+npx wrangler secret put ACCOUNT_WRAP_KEY
+npx wrangler secret put GOOGLE_CLIENT_ID
+npx wrangler secret put APPLE_CLIENT_ID
+npx wrangler deploy --config dist/server/wrangler.json
+```
+
+`ACCOUNT_WRAP_KEY` is 32 random bytes of standard base64
+(`openssl rand -base64 32`). Store a copy outside the repo. Migrations are
+not applied by `wrangler deploy`; run the migrations command before the first
+deploy and again whenever `drizzle/` changes. Confirm `/api/health` returns
+`{"ok":true,"database":"up"}` after the Worker is live. Roll back the Worker
+from the Cloudflare deployment history. Do not reset D1 as part of an
+application rollback.

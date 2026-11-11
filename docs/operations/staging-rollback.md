@@ -2,7 +2,10 @@
 
 ## Staging smoke check
 
-Run the supported Cloudflare/Sites preview after the runtime configuration is
+Deploy target is Cloudflare Workers and the D1 database named in
+`wrangler.toml`. `.openai/hosting.json` is not a deploy target.
+
+Run the local Cloudflare preview after the runtime configuration is
 available:
 
 ```text
@@ -32,8 +35,8 @@ rate limiter to the application.
 
 ## Rollback
 
-Roll back the Worker/Sites release to the previously known-good build using
-the platform deployment history. Do not reset D1 as part of an application
+Roll back the Worker release to the previously known-good build using
+the Cloudflare deployment history. Do not reset D1 as part of an application
 rollback. If a schema migration is not backward compatible, stop the rollout
 and restore the last compatible application/schema pair instead of applying an
 ad-hoc reverse migration.

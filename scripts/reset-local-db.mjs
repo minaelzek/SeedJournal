@@ -77,7 +77,7 @@ try {
   await runWrangler([
     "d1",
     "execute",
-    "seed-journal-d1",
+    "seedjournal",
     "--local",
     "--config",
     configPath,
@@ -91,7 +91,7 @@ try {
     "d1",
     "migrations",
     "apply",
-    "seed-journal-d1",
+    "seedjournal",
     "--local",
     "--config",
     configPath,
