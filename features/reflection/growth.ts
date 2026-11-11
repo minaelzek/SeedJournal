@@ -12,6 +12,12 @@ export interface GrowthResult {
   signalCount: number;
 }
 
+/**
+ * Private depth only. Every completed entry adds 1, 2, 4, or 6 units.
+ * Four or more signals plus a follow-up and a carry line reach 6.
+ * Three signals with both answered reach 4. The floor is 1.
+ * Nothing here can shrink the tree. Sentiment belongs to weather, not growth.
+ */
 export function mapReflectionToGrowth(options: {
   entryId: string;
   reflection?: ReflectionSnapshot;
@@ -47,14 +53,21 @@ export function mapReflectionToGrowth(options: {
     return result("leaf", 1, entryId, 0);
   }
 
-  const signalCount = reflection
-    ? Object.values(reflection.strengths).filter((strength) => strength > 0).length
-    : 0;
+  const signalCount = Math.max(
+    0,
+    reflection
+      ? Object.values(reflection.strengths).filter((strength) => strength > 0).length
+      : 0,
+  );
+  const bothAnswered = followUpAnswered && seedInsightAdded;
 
-  if (signalCount === 5 && followUpAnswered && seedInsightAdded) {
+  if (signalCount >= 4 && bothAnswered) {
     return result("luminous-blossom", 6, entryId, signalCount);
   }
   if (signalCount >= 4) {
+    return result("blossom", 4, entryId, signalCount);
+  }
+  if (signalCount === 3 && bothAnswered) {
     return result("blossom", 4, entryId, signalCount);
   }
   if (signalCount >= 3) {
@@ -72,7 +85,7 @@ function result(
   return {
     memoryForm,
     growthUnits,
-    seed: stableHash(`${entryId}|${memoryForm}|${growthUnits}`),
+    seed: stableHash(`${entryId}|${memoryForm}|${growthUnits}`) & 0x7fffffff,
     signalCount,
   };
 }
@@ -93,4 +106,3 @@ export function growthForEntry(
     languageNeutralCompletionConfirmed,
   });
 }
-

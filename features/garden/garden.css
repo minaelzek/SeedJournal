@@ -20,6 +20,45 @@
   filter: saturate(0.92) contrast(1.025);
 }
 
+.sj-img2threejs-hotspot {
+  width: 1.65rem;
+  height: 1.65rem;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  color: var(--sj-color-blossom-light);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sj-img2threejs-hotspot > span {
+  width: 0.42rem;
+  height: 0.42rem;
+  border-radius: inherit;
+  background: currentColor;
+  box-shadow:
+    0 0 0 0.22rem color-mix(in srgb, currentColor 16%, transparent),
+    0 0 0.9rem color-mix(in srgb, currentColor 70%, transparent);
+  transition:
+    transform var(--sj-motion-hover, 160ms) ease,
+    box-shadow var(--sj-motion-hover, 160ms) ease;
+}
+
+.sj-img2threejs-hotspot:hover > span,
+.sj-img2threejs-hotspot[data-selected] > span {
+  transform: scale(1.35);
+  box-shadow:
+    0 0 0 0.32rem color-mix(in srgb, currentColor 22%, transparent),
+    0 0 1.2rem color-mix(in srgb, currentColor 82%, transparent);
+}
+
+.sj-img2threejs-hotspot:focus-visible {
+  outline: 2px solid var(--sj-color-focus);
+  outline-offset: 2px;
+}
+
 .sj-garden-fallback {
   display: grid;
   place-items: center;
@@ -123,6 +162,8 @@
   position: fixed;
   inset: 0;
   z-index: 60;
+  /* The dimming sits behind the card. It must not steal clicks from Close, Revisit, or Open. */
+  pointer-events: none;
   background: color-mix(in srgb, var(--sj-color-void) 66%, transparent);
   backdrop-filter: blur(0.75rem);
   animation: sj-overlay-in var(--sj-motion-dialog, 320ms)
@@ -132,7 +173,7 @@
 .sj-memory-navigator,
 .sj-memory-preview {
   position: fixed;
-  z-index: 61;
+  z-index: 81;
   color: var(--sj-color-text);
   background: var(--sj-color-surface);
   border: 1px solid var(--sj-color-border);
@@ -146,6 +187,7 @@
   top: 50%;
   left: 50%;
   width: min(calc(100vw - 2.5rem), 32rem);
+  pointer-events: auto;
   max-height: min(78dvh, 42rem);
   display: flex;
   flex-direction: column;
@@ -154,8 +196,7 @@
   transform: translate(-50%, -50%);
 }
 
-.sj-dialog-heading,
-.sj-memory-preview__meta {
+.sj-dialog-heading {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -248,23 +289,9 @@
   width: 0.7rem;
   height: 0.7rem;
   border-radius: 50%;
-  background: var(--sj-color-leaf);
-  box-shadow: 0 0 0 0.22rem
-    color-mix(in srgb, var(--sj-color-leaf) 12%, transparent);
-}
-
-.sj-memory-list__marker:not([data-form="leaf"]) {
   background: var(--sj-color-blossom);
   box-shadow: 0 0 0 0.22rem
     color-mix(in srgb, var(--sj-color-blossom) 12%, transparent);
-}
-
-.sj-memory-list__marker[data-form="luminous-blossom"] {
-  background: var(--sj-color-blossom-light);
-  box-shadow:
-    0 0 0 0.22rem
-      color-mix(in srgb, var(--sj-color-blossom) 14%, transparent),
-    0 0 0.75rem var(--sj-color-blossom);
 }
 
 .sj-memory-list__copy {
@@ -317,55 +344,88 @@
 }
 
 .sj-memory-preview {
-  top: 50%;
-  left: 50%;
-  width: min(calc(100vw - 2.5rem), 29rem);
-  padding: var(--sj-space-6, 1.5rem);
-  border-radius: var(--sj-radius-surface, 1.5rem);
-  transform: translate(-50%, -50%);
-}
-
-.sj-memory-preview__form {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sj-space-2, 0.5rem);
-  color: var(--sj-color-blossom-light);
-  font-size: 0.75rem;
-  line-height: 1.4;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-
-.sj-memory-preview__form svg {
-  width: 1rem;
-  height: 1rem;
+  top: auto;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  width: min(40rem, 100%);
+  max-height: min(46dvh, 24rem);
+  display: flex;
+  flex-direction: column;
+  margin-inline: auto;
+  overflow: auto;
+  padding:
+    var(--sj-space-6, 1.5rem)
+    var(--sj-space-6, 1.5rem)
+    max(1.25rem, env(safe-area-inset-bottom));
+  border-bottom: 0;
+  border-radius: 1.35rem 1.35rem 0 0;
+  transform: translateY(0);
+  z-index: 30;
+  /* Card box only. Petals outside this sheet stay clickable. */
+  pointer-events: auto;
+  animation: sj-memory-sheet-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .sj-memory-preview__date {
   display: block;
-  margin-top: var(--sj-space-7, 1.75rem);
-  color: var(--sj-color-text-muted);
+  flex: 0 0 auto;
+  margin: 0;
+  color: var(--sj-color-text);
   font-size: 0.8125rem;
+  line-height: 1.4;
+  pointer-events: auto;
+  user-select: text;
 }
 
 .sj-memory-preview h2 {
+  flex: 0 0 auto;
   margin-top: var(--sj-space-2, 0.5rem);
   font-size: 1.75rem;
+  pointer-events: auto;
+  user-select: text;
 }
 
+.sj-memory-preview__body,
 .sj-memory-preview__insight {
+  flex: 1 1 auto;
+  min-height: 2.75rem;
   margin: var(--sj-space-4, 1rem) 0 0;
-  color: var(--sj-color-text-muted);
+  overflow: auto;
+  color: var(--sj-color-text);
   font-family: var(--sj-font-poetic);
   font-size: 1.0625rem;
   line-height: 1.65;
+  white-space: pre-wrap;
+  pointer-events: auto;
+  user-select: text;
+  -webkit-user-select: text;
+  overscroll-behavior: contain;
+}
+
+.sj-memory-preview__bond {
+  margin: var(--sj-space-3, 0.75rem) 0 0;
+  color: color-mix(in srgb, var(--sj-color-blossom-light) 72%, var(--sj-color-text-muted));
+  font-size: 0.8125rem;
+  font-style: italic;
+  line-height: 1.45;
+  letter-spacing: 0.01em;
 }
 
 .sj-memory-preview__actions {
   display: grid;
+  flex: 0 0 auto;
   grid-template-columns: 1fr 1fr;
   gap: var(--sj-space-3, 0.75rem);
   margin-top: var(--sj-space-7, 1.75rem);
+  pointer-events: auto;
+}
+
+.sj-memory-preview button,
+.sj-memory-preview a,
+.sj-memory-preview button *,
+.sj-memory-preview a * {
+  pointer-events: auto;
 }
 
 .sj-primary-button,
@@ -380,12 +440,26 @@
   font: inherit;
   font-size: 0.875rem;
   cursor: pointer;
+  transition:
+    transform var(--sj-motion-press, 100ms) var(--sj-ease-press, ease),
+    background-color var(--sj-motion-hover, 160ms) ease,
+    border-color var(--sj-motion-hover, 160ms) ease,
+    box-shadow var(--sj-motion-hover, 160ms) ease;
 }
 
+.sj-primary-button:active:not(:disabled),
+.sj-secondary-button:active:not(:disabled) {
+  transform: scale(var(--sj-press-scale, 0.97));
+}
+
+/* Unified primary dialect — dark moon fill (matches ritual / home CTAs). */
 .sj-primary-button {
-  border: 1px solid var(--sj-color-blossom-light);
-  color: var(--sj-color-void);
-  background: var(--sj-color-blossom-light);
+  border: 1px solid var(--sj-color-moon, #26332d);
+  color: var(--sj-color-blossom-light, #f7d4de);
+  background: var(--sj-color-moon, #26332d);
+  box-shadow:
+    0 0.65rem 1.75rem rgb(38 51 45 / 12%),
+    inset 0 1px 0 rgb(255 255 255 / 12%);
 }
 
 .sj-secondary-button {
@@ -403,7 +477,15 @@
 @keyframes sj-dialog-in {
   from {
     opacity: 0;
-    transform: translate(-50%, calc(-50% + 0.75rem));
+  }
+}
+
+@keyframes sj-memory-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
   }
 }
 
@@ -413,8 +495,7 @@
     filter: brightness(1.08) saturate(0.96) contrast(1.01);
   }
 
-  .sj-memory-navigator,
-  .sj-memory-preview {
+  .sj-memory-navigator {
     top: auto;
     right: 0;
     bottom: 0;
@@ -433,6 +514,19 @@
     animation-name: sj-drawer-in;
   }
 
+  .sj-memory-preview {
+    width: 100%;
+    max-height: min(46dvh, 24rem);
+    border-right: 0;
+    border-left: 0;
+    border-radius: 1.35rem 1.35rem 0 0;
+    transform: translateY(0);
+    padding-bottom: calc(
+      var(--sj-space-6, 1.5rem) + env(safe-area-inset-bottom)
+    );
+    animation: sj-memory-sheet-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
   .sj-memory-preview__actions {
     grid-template-columns: 1fr;
   }
@@ -441,7 +535,6 @@
 @keyframes sj-drawer-in {
   from {
     opacity: 0;
-    transform: translateY(1rem);
   }
 }
 

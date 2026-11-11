@@ -7,7 +7,7 @@ import {
   SpinnerGap,
   Trash,
 } from "@phosphor-icons/react";
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { EntryEditor, type DecryptedJournalEntry } from "@/features/journal";
 import type { JournalEntryPayloadV1 } from "@/lib/contracts";
 import "./archive.css";
@@ -35,7 +35,20 @@ export function EntryReader({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [pending, setPending] = useState<"save" | "delete">();
   const [error, setError] = useState<string>();
+  const warningRef = useRef<HTMLParagraphElement>(null);
+  const deleteTriggerRef = useRef<HTMLButtonElement>(null);
+  const restoreDeleteFocus = useRef(false);
   const date = entry.completedAt ?? entry.updatedAt;
+
+  useLayoutEffect(() => {
+    if (confirmingDelete) {
+      warningRef.current?.focus();
+      return;
+    }
+    if (!restoreDeleteFocus.current) return;
+    restoreDeleteFocus.current = false;
+    deleteTriggerRef.current?.focus();
+  }, [confirmingDelete]);
 
   const save = async () => {
     setPending("save");
@@ -55,7 +68,6 @@ export function EntryReader({
     setError(undefined);
     try {
       await onDelete(entry.id);
-      onBack();
     } catch {
       setError("This entry could not be deleted. Nothing was changed.");
       setPending(undefined);
@@ -69,7 +81,7 @@ export function EntryReader({
           <button
             type="button"
             onClick={onBack}
-            aria-label="Back to journal"
+            aria-label="Return to your sakura"
             className="sj-entry-reader__icon-btn"
           >
             <ArrowLeft aria-hidden size={20} />
@@ -173,10 +185,15 @@ export function EntryReader({
 
             <div className="sj-entry-reader__danger">
               {confirmingDelete ? (
-                <div className="sj-entry-reader__danger-panel">
-                  <p>
-                    Delete the encrypted entry? Its anonymous growth will remain
-                    on your tree.
+                <div
+                  className="sj-entry-reader__danger-panel"
+                  role="group"
+                  aria-labelledby="entry-delete-warning"
+                >
+                  <p id="entry-delete-warning" ref={warningRef} tabIndex={-1}>
+                    These words will be removed. The tree keeps an anonymous
+                    mark. An encrypted download of this journal cannot be
+                    opened again. A readable page is the copy you can keep.
                   </p>
                   <div className="sj-entry-reader__danger-actions">
                     <button
@@ -198,7 +215,10 @@ export function EntryReader({
                     </button>
                     <button
                       type="button"
-                      onClick={() => setConfirmingDelete(false)}
+                      onClick={() => {
+                        restoreDeleteFocus.current = true;
+                        setConfirmingDelete(false);
+                      }}
                       className="sj-entry-reader__btn"
                     >
                       Keep it
@@ -207,6 +227,7 @@ export function EntryReader({
                 </div>
               ) : (
                 <button
+                  ref={deleteTriggerRef}
                   type="button"
                   onClick={() => setConfirmingDelete(true)}
                   className="sj-entry-reader__btn sj-entry-reader__btn--quiet"

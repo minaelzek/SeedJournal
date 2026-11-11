@@ -1,6 +1,15 @@
 export { SakuraScene, type SakuraSceneProps } from "./SakuraScene";
 export { GardenFallback, type GardenFallbackProps } from "./GardenFallback";
 export {
+  canUseWebGL,
+  resolveLivingGardenTier,
+  registerWebGLContextLost,
+  type GardenDemotionTier,
+  type WebGLDocument,
+  type WebGLContextLostTarget,
+} from "./canUseWebGL";
+export { GardenErrorBoundary } from "./GardenErrorBoundary";
+export {
   MemoryNavigator,
   type GardenMemoryRecord,
   type MemoryNavigatorProps,
@@ -17,12 +26,10 @@ export type {
   QualityTier,
   TreeTopology,
 } from "./types";
-/** Illustration-first sakura hero (product default). */
+/** Presentation knobs for growth-reveal copy (not a 2D tree renderer). */
 export {
-  IllustratedSakura,
   presentSakura,
   morphIntentForReveal,
-  type IllustratedSakuraProps,
   type SakuraPresentation,
   type MorphIntent,
 } from "./illustration";

@@ -12,6 +12,34 @@
 
 # testing
 /coverage
+/test-results/
+/playwright-report/
+
+# Living Sakura founder still-pack PNGs (regenerate with npm run still-pack:living-sakura)
+.living-sakura/renders/**/*.png
+.living-sakura/renders/**/*.jpg
+.living-sakura/renders/**/*.webp
+.living-sakura/renders/*.png
+.living-sakura/renders/*.jpg
+.living-sakura/renders/*.webp
+
+# Prototype stills and texture dumps (source models under .img2threejs/generated stay)
+.img2threejs/**/*.png
+.img2threejs/**/*.jpg
+.img2threejs/**/*.jpeg
+.img2threejs/**/*.webp
+.img2threejs-v2/**/*.png
+.img2threejs-v2/**/*.jpg
+.img2threejs-v2/**/*.jpeg
+.img2threejs-v2/**/*.webp
+
+# Local captures and one-off diagnostics
+/*.png
+/*.jpg
+/*.jpeg
+/tmp-*/
+tmp-*.mts
+tmp-*.ts
 
 # next.js
 /.next/
@@ -30,6 +58,8 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.dev.vars
+.dev.vars.*
 
 # vercel
 .vercel

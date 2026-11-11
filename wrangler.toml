@@ -1,0 +1,13 @@
+# Local-only Wrangler config (not ChatGPT Sites).
+# Used for D1 migrations and local Miniflare state under .wrangler/
+
+name = "seed-journal"
+main = "worker/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "seed-journal-d1"
+database_id = "00000000-0000-4000-8000-000000000000"
+migrations_dir = "drizzle"

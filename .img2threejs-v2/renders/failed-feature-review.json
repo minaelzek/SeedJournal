@@ -1,0 +1,32 @@
+[
+  {
+    "id": "asymmetric-sakura-silhouette",
+    "score": 0.28,
+    "visible": true,
+    "notes": "Long bare leaders and a harsh central fork do not form the broad layered crown in the concept."
+  },
+  {
+    "id": "continuous-root-flare",
+    "score": 0.22,
+    "visible": true,
+    "notes": "The new flare is continuous but renders black and ends as two pointed feet rather than grounded roots."
+  },
+  {
+    "id": "signature-low-bough",
+    "score": 0.42,
+    "visible": true,
+    "notes": "The low bough is identifiable but reads as a straight shelf with no recovering terminal gesture."
+  },
+  {
+    "id": "crown-windows",
+    "score": 0.3,
+    "visible": true,
+    "notes": "Negative space is mostly absence of crown mass, not composed windows inside a coherent canopy."
+  },
+  {
+    "id": "flowering-neighborhoods",
+    "score": 0.35,
+    "visible": true,
+    "notes": "One right-side neighborhood dominates while most flowering spurs collapse or disappear in projection."
+  }
+]

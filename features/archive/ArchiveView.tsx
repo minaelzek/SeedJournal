@@ -37,6 +37,14 @@ export interface ArchiveViewProps {
   onBack?: () => void;
 }
 
+function todayLocalDayEnCa(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+}
+
 export function ArchiveView({
   entries,
   onOpenEntry,
@@ -47,12 +55,22 @@ export function ArchiveView({
   const deferredQuery = useDeferredValue(query);
   const [category, setCategory] = useState<PromptCategory | "all">("all");
   const [tag, setTag] = useState("");
+  const [onThisDay, setOnThisDay] = useState(false);
   const tags = useMemo(() => collectArchiveTags(entries), [entries]);
+  const todayLocalDay = useMemo(() => todayLocalDayEnCa(), []);
   const results = useMemo(
-    () => searchEntries(entries, { query: deferredQuery, category, tag }),
-    [category, deferredQuery, entries, tag],
+    () =>
+      searchEntries(entries, {
+        query: deferredQuery,
+        category,
+        tag,
+        onThisDayLocalDay: onThisDay ? todayLocalDay : undefined,
+      }),
+    [category, deferredQuery, entries, onThisDay, tag, todayLocalDay],
   );
-  const searching = Boolean(query || category !== "all" || tag);
+  const searching = Boolean(
+    query || category !== "all" || tag || onThisDay,
+  );
 
   return (
     <section className="sj-archive" id="main-content" aria-label="Journal archive">
@@ -77,11 +95,12 @@ export function ArchiveView({
         </header>
 
         <div className="sj-archive__intro">
-          <p className="sj-archive__eyebrow">Your living record</p>
+          <p className="sj-archive__eyebrow">Held with the tree</p>
           <h1>Journal</h1>
           <p className="sj-archive__lede">
-            Every entry remains private to your unlocked session. Return when a
-            memory wants another breath.
+            Every page remains private to your unlocked session. Each one is an
+            equal memory petal on your sakura — return when one wants another
+            breath.
           </p>
         </div>
 
@@ -123,7 +142,20 @@ export function ArchiveView({
                 {item.label}
               </button>
             ))}
+            <button
+              type="button"
+              aria-pressed={onThisDay}
+              onClick={() => setOnThisDay((current) => !current)}
+              className="sj-archive__chip sj-archive__chip--on-this-day"
+            >
+              On this day
+            </button>
           </div>
+          {onThisDay ? (
+            <p className="sj-archive__on-this-day-note">
+              Past pages that share today’s date — rediscovery without a streak.
+            </p>
+          ) : null}
 
           {tags.length > 0 ? (
             <label className="sj-archive__tag-row">
@@ -169,6 +201,7 @@ export function ArchiveView({
               setQuery("");
               setCategory("all");
               setTag("");
+              setOnThisDay(false);
             }}
             onNewEntry={onNewEntry}
           />
@@ -191,7 +224,11 @@ function EntryRow({
     entry.payload.seedInsight.trim() ||
     entry.payload.prompt.renderedText;
   return (
-    <button type="button" onClick={onOpen} className="sj-archive__row">
+    <button type="button" onClick={onOpen} className="sj-archive__row sj-control">
+      <span
+        className="sj-archive__petal-mark"
+        aria-hidden="true"
+      />
       <time dateTime={new Date(timestamp).toISOString()}>
         {new Intl.DateTimeFormat(undefined, {
           month: "short",
@@ -204,6 +241,7 @@ function EntryRow({
         <span className="sj-archive__row-excerpt">
           {entryExcerpt(entry.payload.body)}
         </span>
+        <span className="sj-archive__row-form">Memory petal</span>
         {entry.payload.tags.length > 0 ? (
           <span className="sj-archive__tags">
             {entry.payload.tags.slice(0, 3).map((tag) => (
@@ -232,7 +270,7 @@ function EmptyArchive({
       <h2>{searching ? "No entries found" : "Your first page is waiting"}</h2>
       <p>
         {searching
-          ? "Try a different word, path, or tag."
+          ? "Try a different word, path, tag, or clear On this day."
           : "The record will grow quietly as you return to care for the tree."}
       </p>
       <button

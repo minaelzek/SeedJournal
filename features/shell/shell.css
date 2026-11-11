@@ -91,18 +91,33 @@
   animation-delay: -4.1s;
 }
 
+.sj-app-frame[data-weather="rain"] .sj-app-frame__weather {
+  background: linear-gradient(
+    180deg,
+    rgb(90 116 132 / 8%) 0%,
+    rgb(90 116 132 / 3%) 100%
+  );
+}
+
+.sj-app-frame[data-weather="rain"] .sj-app-frame__weather::before,
+.sj-app-frame[data-weather="rain"] .sj-app-frame__weather::after {
+  opacity: 0;
+  animation: none;
+}
+
 .sj-app-frame[data-weather="sunbreak"] .sj-app-frame__weather::before {
   top: -22rem;
   right: -14rem;
-  width: 58rem;
-  height: 58rem;
+  width: 62rem;
+  height: 62rem;
   border-radius: 50%;
-  opacity: 0.72;
+  opacity: 0.86;
   background: radial-gradient(
     circle,
-    rgb(255 246 213 / 72%),
-    rgb(255 249 230 / 26%) 38%,
-    transparent 69%
+    rgb(255 244 196 / 88%),
+    rgb(255 232 164 / 38%) 34%,
+    rgb(255 249 230 / 12%) 58%,
+    transparent 72%
   );
   animation: sj-weather-sun 8s ease-in-out infinite alternate;
 }
@@ -166,21 +181,22 @@
   transform: translate(-50%, -50%) rotate(-8deg);
 }
 
-/* Home: sakura is the product — large, centered, edge chrome only. */
-.sj-app-frame[data-garden-renderer="illustration"] .sj-app-frame__garden {
-  /* Illustration path: soft zen field behind the character tree */
-  background:
-    radial-gradient(
-      ellipse 70% 40% at 50% 58%,
-      color-mix(in srgb, var(--sj-color-blossom-light) 22%, transparent),
-      transparent 72%
-    ),
-    linear-gradient(
-      180deg,
-      color-mix(in srgb, var(--sj-color-void) 70%, white) 0%,
-      var(--sj-color-void) 45%,
-      color-mix(in srgb, var(--sj-color-soil) 14%, var(--sj-color-void)) 100%
-    );
+/* Living Sakura: full-frame 3D stage — no CSS scale (would skew orbit/hits).
+   Bottom inset keeps the tree ground line above the write dock (~CTA height). */
+.sj-app-frame[data-garden-renderer="living"] .sj-app-frame__garden {
+  pointer-events: auto;
+  transform: none;
+  background: transparent;
+  /* Reserve chrome: header strip + dock so the companion is never under the CTA. */
+  top: 0;
+  bottom: 0;
+  clip-path: inset(0 0 0 0);
+}
+
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+  .sj-app-frame__garden {
+  /* Soft bottom vignette only via content; camera framing lifts the tree. */
+  padding-bottom: 0;
 }
 
 .sj-app-frame[data-garden-mode="active"] .sj-app-frame__garden {
@@ -188,10 +204,13 @@
   transform-origin: 50% 52%;
 }
 
-.sj-app-frame[data-garden-renderer="illustration"][data-garden-mode="active"]
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+  .sj-app-frame__garden,
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="ambient"]
+  .sj-app-frame__garden,
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="paused"]
   .sj-app-frame__garden {
-  transform: translateY(2vh) scale(1.08);
-  transform-origin: 50% 55%;
+  transform: none;
 }
 
 .sj-app-frame[data-garden-mode="active"]
@@ -220,9 +239,20 @@
 }
 
 .sj-app-frame[data-garden-mode="ambient"] .sj-app-frame__garden {
-  opacity: 0.42;
-  filter: saturate(0.72) brightness(1.02);
-  transform: translateX(16vw) scale(0.92);
+  /* Companion stays present while writing — glass ritual, readable garden. */
+  opacity: 0.74;
+  filter: saturate(0.88) brightness(1.02);
+  transform: translateX(8vw) scale(0.96);
+}
+
+.sj-app-frame[data-reveal-mode] .sj-app-frame__garden {
+  opacity: 1;
+  filter: none;
+  transform: translateY(-1vh) scale(1.08);
+  transition:
+    opacity var(--sj-motion-garden, 420ms) var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)),
+    filter var(--sj-motion-garden, 420ms) var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)),
+    transform var(--sj-motion-garden, 420ms) var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1));
 }
 
 .sj-app-frame[data-garden-mode="paused"] .sj-app-frame__garden {
@@ -230,10 +260,79 @@
   filter: saturate(0.5) brightness(1.02);
 }
 
+/*
+  LIVING CASCADE LOCK — must stay AFTER every stage / ambient / reveal /
+  return-bud transform above. CSS scale on living WebGL skews orbit/hits and
+  drops early trees under the write dock; camera framing owns composition.
+  Marker for tests: living-transform-cascade-lock
+*/
+.sj-app-frame[data-garden-renderer="living"] .sj-app-frame__garden,
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+  .sj-app-frame__garden,
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="ambient"]
+  .sj-app-frame__garden,
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="paused"]
+  .sj-app-frame__garden,
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+  .sj-app-frame__garden[data-tree-stage="seed"],
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+  .sj-app-frame__garden[data-tree-stage="sprout"],
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+  .sj-app-frame__garden[data-tree-stage="sapling"],
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+  .sj-app-frame__garden[data-tree-stage="young-tree"],
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+  .sj-app-frame__garden[data-tree-stage="established"],
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+  .sj-app-frame__garden[data-tree-stage="mature"],
+.sj-app-frame[data-garden-renderer="living"][data-return-bud][data-garden-mode="active"]
+  .sj-app-frame__garden,
+.sj-app-frame[data-garden-renderer="living"][data-reveal-mode]
+  .sj-app-frame__garden {
+  transform: none;
+  transform-origin: 50% 50%;
+}
+
+.sj-app-frame[data-garden-renderer="living"][data-garden-mode="ambient"]
+  .sj-app-frame__garden {
+  /* Ambient still dims opacity/filter but never CSS-scales the living body. */
+  transform: none;
+}
+
 .sj-app-frame__content {
   position: relative;
   min-height: 100dvh;
   z-index: 1;
+}
+
+/* Continuous product film between major surfaces (calm enter, not hard cut). */
+.sj-app-frame__content > * {
+  animation: sj-route-film-enter var(--sj-motion-stage, 380ms)
+    var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+
+/* Garden mode morph — soft opacity/filter bridge for home ↔ ritual ↔ archive. */
+.sj-app-frame__garden {
+  transition:
+    opacity var(--sj-motion-garden, 480ms) var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)),
+    filter var(--sj-motion-garden, 480ms) var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+@keyframes sj-route-film-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.45rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sj-app-frame__content > * {
+    animation: none;
+  }
 }
 
 .sj-app-frame[data-garden-mode="active"] .sj-app-frame__content {
@@ -263,7 +362,7 @@
   top: 0;
   right: 0;
   left: 0;
-  min-height: 5rem;
+  min-height: 3.5rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -281,8 +380,8 @@
   position: absolute;
   z-index: -1;
   inset: 0 0 auto;
-  height: 8rem;
-  background: linear-gradient(to bottom, color-mix(in srgb, var(--sj-color-void) 88%, transparent), transparent);
+  height: 4.5rem;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--sj-color-void) 55%, transparent), transparent);
   pointer-events: none;
 }
 
@@ -330,6 +429,34 @@
   box-shadow: 0 0 0 0.16rem color-mix(in srgb, var(--sj-color-leaf) 10%, transparent);
 }
 
+.sj-header__weather[data-weather="rain"] span {
+  background: #7f97a8;
+  box-shadow: 0 0 0 0.16rem rgb(127 151 168 / 16%);
+}
+
+.sj-header__weather[data-weather="mist"] span {
+  background: #b7bdc4;
+  box-shadow: 0 0 0 0.16rem rgb(183 189 196 / 18%);
+}
+
+.sj-header__weather[data-weather="sunbreak"] span {
+  background: #e2b46a;
+  box-shadow: 0 0 0 0.16rem rgb(226 180 106 / 20%);
+}
+
+.sj-header__weather[data-weather="dew"] span {
+  background: #8fb0b4;
+  box-shadow: 0 0 0 0.16rem rgb(143 176 180 / 16%);
+}
+
+.sj-header__weather[data-weather="breeze"] span {
+  background: var(--sj-color-leaf);
+}
+
+.sj-header__weather[data-weather="still"] span {
+  background: color-mix(in srgb, var(--sj-color-text-muted) 70%, white);
+}
+
 .sj-wordmark {
   display: inline-flex;
   align-items: center;
@@ -364,6 +491,13 @@
   border-radius: calc(var(--sj-radius-control, 0.875rem) + 0.25rem);
   background: color-mix(in srgb, var(--sj-color-surface) 76%, transparent);
   backdrop-filter: blur(1rem);
+}
+
+.sj-header .sj-icon-button:focus-visible,
+.sj-wordmark:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sj-color-blossom-shadow, var(--color-focus)) 72%, transparent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--sj-color-blossom, var(--color-blossom)) 22%, transparent);
 }
 
 .sj-home {
@@ -401,10 +535,11 @@
     );
 }
 
-/* Open vertical stage for the living sakura. */
+/* Open vertical stage for the living sakura — mid-frame hero, above dock. */
 .sj-home__tree-stage {
   position: absolute;
-  inset: 16% 6% 22%;
+  /* Leave room for header welcome + bottom dock; tree owns the middle. */
+  inset: 14% 4% 28%;
   pointer-events: none;
 }
 
@@ -464,16 +599,46 @@
   color: color-mix(in srgb, var(--sj-color-leaf) 72%, var(--sj-color-text-muted));
 }
 
-/* Bottom dock — habit + single primary; tree stays clear above. */
+/* Bottom dock — single safe-area column: on-this-day → rhythm → CTA/return-bud.
+   Compact glass stack so it never claims the mid-frame where the tree lives. */
 .sj-home__dock {
   position: relative;
   z-index: 4;
   display: grid;
   justify-items: center;
-  gap: 0.55rem;
-  width: min(100%, 22rem);
+  gap: 0.45rem;
+  width: min(100%, 20.5rem);
+  max-height: min(42dvh, 22rem);
   margin-top: auto;
+  padding: 0.35rem 0.15rem max(0.35rem, env(safe-area-inset-bottom));
   pointer-events: auto;
+}
+
+/* Dock chrome eases in after the arrival beat. The line and the journal button stay still. */
+.sj-home:not([data-first-open]) .sj-home__dock > :not(.sr-only):not(.sj-home__actions):not(.sj-home__arrival) {
+  animation: sj-dock-stagger-in 460ms
+    var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+
+.sj-home:not([data-first-open]) .sj-home__dock > :nth-child(1 of :not(.sr-only)) {
+  animation-delay: 40ms;
+}
+
+.sj-home:not([data-first-open]) .sj-home__dock > :nth-child(2 of :not(.sr-only)) {
+  animation-delay: 120ms;
+}
+
+.sj-home:not([data-first-open]) .sj-home__dock > :nth-child(3 of :not(.sr-only)) {
+  animation-delay: 200ms;
+}
+
+.sj-home:not([data-first-open]) .sj-home__dock > :nth-child(4 of :not(.sr-only)) {
+  animation-delay: 280ms;
+}
+
+.sj-home__dock .sj-on-this-day {
+  max-height: 7.5rem;
+  overflow: auto;
 }
 
 /* Return-bud lives in the dock — never mid-canopy. */
@@ -705,10 +870,122 @@
 .sj-home__memory-control {
   position: absolute;
   right: max(var(--sj-page-gutter, 3rem), env(safe-area-inset-right));
-  /* Above dock — never competes with primary CTA weight. */
-  bottom: max(calc(7.5rem + env(safe-area-inset-bottom)), 8.25rem);
+  /* Sit just above dock stack — never mid-canopy. */
+  bottom: max(calc(8.75rem + env(safe-area-inset-bottom)), 9.5rem);
   pointer-events: auto;
   z-index: 3;
+}
+
+/* A door into memory, not a petal score. The accessible name stays on the trigger. */
+.sj-home .sj-home__memory-control .sj-memory-explore__count {
+  display: none;
+}
+
+.sj-home .sj-home__memory-control .sj-memory-explore {
+  gap: 0.4rem;
+  padding: 0 0.8rem 0 0.65rem;
+}
+
+.sj-home .sj-home__memory-control .sj-memory-explore::after {
+  content: "Memories";
+  font-size: 0.78rem;
+  font-weight: 560;
+  letter-spacing: 0.01em;
+  line-height: 1;
+}
+
+/* On This Day — lives in the dock stack (no absolute collision with CTA). */
+.sj-on-this-day {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 22rem;
+  margin: 0;
+  padding: 0.75rem 0.9rem 0.85rem;
+  border: 1px solid color-mix(in srgb, var(--sj-color-border) 70%, transparent);
+  border-radius: 1.1rem;
+  background: color-mix(in srgb, var(--sj-color-surface) 88%, transparent);
+  box-shadow: 0 0.6rem 1.6rem rgb(70 55 48 / 10%);
+  backdrop-filter: blur(12px);
+  pointer-events: auto;
+}
+
+@keyframes sj-dock-stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sj-journal-cta-breath {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.93;
+  }
+}
+
+.sj-on-this-day__kicker {
+  margin: 0 0 0.2rem;
+  font-size: 0.68rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--sj-color-blossom) 70%, var(--sj-color-text-muted));
+}
+
+.sj-on-this-day__lede {
+  margin: 0 0 0.55rem;
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: color-mix(in srgb, var(--sj-color-text) 72%, var(--sj-color-text-muted));
+}
+
+.sj-on-this-day__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.sj-on-this-day__item {
+  display: grid;
+  gap: 0.1rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: color-mix(in srgb, var(--sj-color-blossom-light) 35%, var(--sj-color-surface));
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.sj-on-this-day__item:hover,
+.sj-on-this-day__item:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--sj-color-blossom-light) 55%, var(--sj-color-surface));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sj-color-blossom) 28%, transparent);
+}
+
+.sj-on-this-day__title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--sj-color-text);
+}
+
+.sj-on-this-day__meta {
+  font-size: 0.72rem;
+  color: var(--sj-color-text-muted);
 }
 
 .sj-seed-companion {
@@ -820,9 +1097,11 @@
   letter-spacing: -0.015em;
   cursor: pointer;
   transition:
-    transform var(--sj-motion-press, 100ms) ease,
-    box-shadow var(--sj-motion-hover, 160ms) ease,
-    background-color var(--sj-motion-hover, 160ms) ease;
+    transform var(--sj-motion-press, 100ms) var(--sj-ease-press, cubic-bezier(0.2, 0.9, 0.3, 1)),
+    box-shadow var(--sj-motion-hover, 160ms) var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)),
+    background-color var(--sj-motion-hover, 160ms) ease,
+    border-color var(--sj-motion-hover, 160ms) ease,
+    color var(--sj-motion-hover, 160ms) ease;
 }
 
 .sj-journal-cta:hover {
@@ -832,6 +1111,14 @@
     0 0 2.6rem color-mix(in srgb, var(--sj-color-blossom) 28%, transparent);
 }
 
+.sj-home .sj-journal-cta:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.sj-home:not([data-first-open]) .sj-journal-cta {
+  animation: sj-journal-cta-breath 11s ease-in-out infinite;
+}
+
 /* Open-day CTA is the single magnetic primary path. */
 .sj-home[data-care-state="open"] .sj-journal-cta,
 .sj-home[data-care-state="first"] .sj-journal-cta {
@@ -839,6 +1126,47 @@
   box-shadow:
     0 0.6rem 2.2rem color-mix(in srgb, var(--sj-color-void) 28%, transparent),
     0 0 2.4rem color-mix(in srgb, var(--sj-color-blossom) 26%, transparent);
+}
+
+/* Arrival: wordmark and one line. The journal button waits until the beat ends. */
+.sj-app-frame__content:has(.sj-home[data-first-open]) .sj-header__actions,
+.sj-app-frame__content:has(.sj-home[data-first-open]) .sj-header__weather,
+.sj-app-frame__content:has(.sj-home[data-first-open]) .sj-header__end > .sr-only,
+.sj-app-frame__content:has(.sj-home[data-conversing]) .sj-header__actions {
+  display: none;
+}
+
+.sj-home__arrival {
+  margin: 0;
+  color: var(--sj-color-text);
+  font-family: var(--sj-font-poetic);
+  font-size: clamp(1.55rem, 3.2vw, 2rem);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow: 0 1px 14px color-mix(in srgb, var(--sj-color-void) 40%, transparent);
+}
+
+.sj-home[data-first-open] .sj-home__arrival {
+  animation: sj-first-open-line 1.15s var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+
+.sj-home[data-first-open] .sj-home__dock > :not(.sj-home__arrival),
+.sj-home[data-first-open] .sj-journal-cta {
+  display: none;
+}
+
+@keyframes sj-first-open-line {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .sj-home[data-tended-today] .sj-journal-cta {
@@ -893,13 +1221,29 @@
   background: color-mix(in srgb, var(--sj-color-text) 5%, transparent);
 }
 
-.sj-journal-cta:active {
-  transform: translateY(1px);
+.sj-journal-cta:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sj-color-blossom-shadow) 72%, transparent);
+  outline-offset: 4px;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--sj-color-blossom) 22%, transparent);
 }
 
-.sj-journal-cta:focus-visible {
-  outline: 2px solid var(--sj-color-focus);
-  outline-offset: 4px;
+.sj-home[data-conversing] .sj-home__welcome,
+.sj-home[data-conversing] .sj-home__dock,
+.sj-home[data-conversing] .sj-home__memory-control {
+  display: none;
+}
+
+/* Sheet lives under .sj-home__memory-control (z-index 3). Dock is 4, and its
+   children set pointer-events: auto, which escapes a parent of none. */
+.sj-home:has(.sj-memory-preview) .sj-home__dock {
+  visibility: hidden;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sj-home:has(.sj-memory-preview) .sj-home__dock * {
+  pointer-events: none;
 }
 
 .sj-journal-cta:disabled {
@@ -959,6 +1303,45 @@
   .sj-app-frame[data-return-bud][data-garden-mode="active"]
     .sj-app-frame__garden[data-tree-stage="mature"] {
     transform: translateY(-1vh) scale(1.26);
+  }
+
+  /*
+    LIVING MOBILE CASCADE LOCK — after all max-width garden transforms.
+    Marker for tests: living-transform-cascade-lock-mobile
+  */
+  .sj-app-frame[data-garden-renderer="living"] .sj-app-frame__garden,
+  .sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+    .sj-app-frame__garden,
+  .sj-app-frame[data-garden-renderer="living"][data-garden-mode="ambient"]
+    .sj-app-frame__garden,
+  .sj-app-frame[data-garden-renderer="living"][data-garden-mode="paused"]
+    .sj-app-frame__garden,
+  .sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="seed"],
+  .sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="sprout"],
+  .sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="sapling"],
+  .sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="young-tree"],
+  .sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="established"],
+  .sj-app-frame[data-garden-renderer="living"][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="mature"],
+  .sj-app-frame[data-garden-renderer="living"][data-return-bud][data-garden-mode="active"]
+    .sj-app-frame__garden,
+  .sj-app-frame[data-garden-renderer="living"][data-return-bud][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="sapling"],
+  .sj-app-frame[data-garden-renderer="living"][data-return-bud][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="young-tree"],
+  .sj-app-frame[data-garden-renderer="living"][data-return-bud][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="established"],
+  .sj-app-frame[data-garden-renderer="living"][data-return-bud][data-garden-mode="active"]
+    .sj-app-frame__garden[data-tree-stage="mature"],
+  .sj-app-frame[data-garden-renderer="living"][data-reveal-mode]
+    .sj-app-frame__garden {
+    transform: none;
+    transform-origin: 50% 50%;
   }
 
   .sj-header {
@@ -1065,8 +1448,14 @@
 }
 
 @media (max-width: 23rem) {
-  .sj-header .sj-icon-button:nth-child(2) {
-    display: none;
+  .sj-wordmark {
+    font-size: 1.15rem;
+    gap: 0.4rem;
+  }
+
+  .sj-header .sj-icon-button {
+    width: 2.5rem;
+    height: 2.5rem;
   }
 
   .sj-journal-cta {
@@ -1075,6 +1464,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sj-home[data-first-open] .sj-home__welcome,
+  .sj-home[data-first-open] .sj-home__arrival {
+    animation: none;
+  }
+
   .sj-app-frame__garden,
   .sj-journal-cta {
     transition-duration: 150ms;
@@ -1086,13 +1480,37 @@
   .sj-app-frame__weather::before,
   .sj-app-frame__weather::after,
   .sj-app-frame__weather span,
-  .sj-care-rhythm__day[data-open] i {
+  .sj-care-rhythm__day[data-open] i,
+  .sj-home__dock > *,
+  .sj-home:not([data-first-open]) .sj-home__dock > :not(.sr-only):not(.sj-home__actions),
+  .sj-home:not([data-first-open]) .sj-journal-cta,
+  .sj-on-this-day {
     animation: none;
+  }
+
+  /* Match weather selectors so sj-weather-mist / breeze / rain actually stop. */
+  .sj-app-frame[data-weather="mist"] .sj-app-frame__weather::before,
+  .sj-app-frame[data-weather="mist"] .sj-app-frame__weather::after,
+  .sj-app-frame[data-weather="breeze"] .sj-app-frame__weather::before,
+  .sj-app-frame[data-weather="breeze"] .sj-app-frame__weather::after,
+  .sj-app-frame[data-weather="rain"] .sj-app-frame__weather::before,
+  .sj-app-frame[data-weather="rain"] .sj-app-frame__weather::after,
+  .sj-app-frame[data-weather="rain"] .sj-app-frame__weather span,
+  .sj-app-frame[data-weather="dew"] .sj-app-frame__weather::before,
+  .sj-app-frame[data-weather="sunbreak"] .sj-app-frame__weather::before {
+    animation: none;
+  }
+
+  .sj-home[data-first-open] .sj-journal-cta,
+  .sj-home .sj-journal-cta:active:not(:disabled),
+  .sj-lost__retry:active {
+    transform: none;
   }
 
   .sj-app-frame[data-tended-today][data-garden-mode="active"]
     .sj-app-frame__weather
     span:last-child {
+    animation: none;
     opacity: 0.36;
     transform: translate(-50%, -50%);
   }
@@ -1183,6 +1601,15 @@
   }
 }
 
+@keyframes sj-weather-rain {
+  from {
+    transform: translate3d(0, -18%, 0);
+  }
+  to {
+    transform: translate3d(-6%, 22%, 0);
+  }
+}
+
 @keyframes sj-care-afterglow {
   from {
     opacity: 0.3;
@@ -1207,5 +1634,100 @@
     box-shadow:
       0 0 0 0.22rem color-mix(in srgb, var(--sj-color-surface) 45%, transparent),
       0 0 1.1rem color-mix(in srgb, var(--sj-color-blossom) 36%, transparent);
+  }
+}
+
+/* Quiet missing routes — ink and blossom, not an error console. */
+.sj-lost {
+  min-height: 100dvh;
+  margin: 0;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 1.15rem;
+  padding:
+    max(2.5rem, env(safe-area-inset-top))
+    max(1.5rem, env(safe-area-inset-right))
+    max(2.5rem, env(safe-area-inset-bottom))
+    max(1.5rem, env(safe-area-inset-left));
+  text-align: center;
+  color: var(--color-text-primary, #26332d);
+  background:
+    radial-gradient(
+      ellipse at 50% 0%,
+      color-mix(in srgb, var(--sj-color-blossom, #e8a4b4) 16%, transparent),
+      transparent 46%
+    ),
+    var(--color-background, #f5f3ed);
+}
+
+.sj-lost__seed {
+  width: 0.72rem;
+  height: 1.06rem;
+  border: 1px solid var(--primitive-blossom, #c78179);
+  border-radius: 80% 20% 70% 30%;
+  background: color-mix(in srgb, var(--primitive-blossom, #c78179) 24%, white);
+  transform: rotate(32deg);
+}
+
+.sj-lost h1 {
+  margin: 0;
+  max-width: 16rem;
+  font-family: var(--font-newsreader), Georgia, "Times New Roman", serif;
+  font-size: clamp(1.85rem, 5vw, 2.4rem);
+  font-weight: 450;
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+}
+
+.sj-lost__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.85rem 1.1rem;
+  margin-top: 0.35rem;
+}
+
+.sj-lost__retry,
+.sj-lost__home {
+  font-family: var(--font-inter), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 560;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.sj-lost__retry {
+  min-height: 2.75rem;
+  padding: 0 1.15rem;
+  border: 1px solid var(--color-text-primary, #26332d);
+  border-radius: 999px;
+  color: var(--primitive-blossom-light, #fffdfa);
+  background: var(--color-text-primary, #26332d);
+}
+
+.sj-lost__retry:active {
+  transform: scale(0.98);
+}
+
+.sj-lost__home {
+  color: var(--color-text-secondary, #66716a);
+}
+
+.sj-lost__home:hover {
+  color: var(--color-text-primary, #26332d);
+}
+
+.sj-lost__retry:focus-visible,
+.sj-lost__home:focus-visible {
+  outline: 2px solid var(--color-focus, #a75d58);
+  outline-offset: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sj-lost__seed,
+  .sj-lost__retry:active {
+    transform: none;
   }
 }

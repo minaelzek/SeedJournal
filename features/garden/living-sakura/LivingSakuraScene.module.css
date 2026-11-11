@@ -1,0 +1,535 @@
+/* Product garden slot inside AppFrame — fill the fixed stage. */
+.productGarden {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: auto;
+  background:
+    radial-gradient(circle at 50% 16%, rgb(255 246 240 / 90%), transparent 44%),
+    radial-gradient(ellipse 70% 50% at 50% 92%, rgb(232 200 196 / 18%), transparent 58%),
+    linear-gradient(165deg, #f7f0e8 0%, #f0e5d9 48%, #e8d9d0 100%);
+}
+
+.productGarden .scene {
+  position: absolute;
+  inset: 0;
+}
+
+/* Home chrome carries guidance; keep the product stage visually quiet. */
+.productGarden .canvasHint {
+  display: none;
+}
+
+/* Post-journal growth reveal — same living body, sized to the ceremony stage. */
+.revealGarden {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  background: transparent;
+  border-radius: inherit;
+}
+
+.revealGarden .scene {
+  position: absolute;
+  inset: 0;
+}
+
+.revealGarden .canvasHint {
+  display: none;
+}
+
+.lab {
+  position: relative;
+  min-height: 100dvh;
+  padding: clamp(0.75rem, 1.4vw, 1.35rem);
+  color: #493d39;
+  background:
+    radial-gradient(circle at 18% 8%, rgb(255 248 241 / 94%), transparent 31rem),
+    radial-gradient(ellipse 55% 40% at 72% 88%, rgb(236 206 202 / 16%), transparent 52%),
+    linear-gradient(145deg, #f8f1e9 0%, #f2e6db 52%, #ebdcd3 100%);
+}
+
+/* Founder still-pack: full-bleed stage, no chrome, screenshot-stable background. */
+.lab[data-clean-capture="true"] {
+  padding: 0;
+  background: #f2e8dc;
+}
+
+.lab[data-clean-capture="true"] .stage {
+  width: 100%;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.lab[data-clean-capture="true"] .canvasHint {
+  display: none;
+}
+
+.header {
+  position: absolute;
+  z-index: 4;
+  top: clamp(1.6rem, 3vw, 2.7rem);
+  left: clamp(1.7rem, 4vw, 4.5rem);
+  right: clamp(1.7rem, 4vw, 4.5rem);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 2rem;
+  align-items: end;
+  margin: 0 auto;
+  pointer-events: none;
+}
+
+.eyebrow,
+.controls p {
+  margin: 0 0 0.55rem;
+  color: #986f72;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.header h1 {
+  max-width: 17ch;
+  margin: 0;
+  color: #4b3b38;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 3.3vw, 3.8rem);
+  font-weight: 400;
+  letter-spacing: -0.045em;
+  line-height: 0.93;
+}
+
+.intro {
+  max-width: 28rem;
+  margin: 0.8rem 0 0;
+  color: #75615d;
+  font-size: clamp(0.82rem, 1.15vw, 0.98rem);
+  line-height: 1.65;
+}
+
+/* Compact life-stage line under the title (primary on mobile). */
+.lifeStageInline {
+  display: none;
+  margin: 0.65rem 0 0;
+  color: #8a6a6c;
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+.lifeStageInline span:first-child {
+  font-weight: 600;
+  color: #7a5558;
+}
+
+.phaseCard {
+  display: grid;
+  min-width: 9.5rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid rgb(116 83 78 / 14%);
+  border-radius: 1.25rem;
+  background: rgb(255 251 246 / 58%);
+  box-shadow: 0 1.2rem 3rem rgb(95 63 57 / 8%);
+  backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.phaseCard span {
+  color: #9a7172;
+  font-size: 0.75rem;
+}
+
+.phaseCard strong {
+  margin-top: 0.25rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2.25rem;
+  font-weight: 400;
+}
+
+.phaseCard small {
+  color: #8b7771;
+}
+
+.stage {
+  position: relative;
+  width: min(92rem, 100%);
+  height: max(44rem, calc(100dvh - 1.5rem));
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid rgb(116 83 78 / 12%);
+  border-radius: clamp(1.5rem, 3vw, 2.8rem);
+  /* Soft product stage — matches canvas fog/background for screenshot continuity. */
+  background:
+    radial-gradient(ellipse 70% 55% at 50% 38%, #f7efe6 0%, #f2e8dc 52%, #ebe0d4 100%);
+  box-shadow:
+    0 2rem 6rem rgb(98 66 61 / 12%),
+    inset 0 1px rgb(255 255 255 / 70%);
+}
+
+.stage:focus {
+  outline: none;
+}
+
+.stage:focus-visible {
+  outline: 3px solid rgb(151 92 105 / 42%);
+  outline-offset: 3px;
+}
+
+.scene {
+  position: absolute;
+  inset: 0;
+}
+
+.scene canvas {
+  /* Capture horizontal + vertical drags for full orbit; page scroll lives outside the stage. */
+  touch-action: none;
+}
+
+.stageWash {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgb(255 252 248 / 40%), transparent 34%),
+    radial-gradient(ellipse 90% 55% at 50% 0%, rgb(255 236 232 / 14%), transparent 50%),
+    radial-gradient(circle at center 85%, transparent 0, transparent 22%, rgb(186 142 132 / 7%) 70%, rgb(118 78 72 / 10%) 100%);
+}
+
+.canvasHint {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 1rem;
+  margin: 0;
+  color: rgb(93 70 67 / 62%);
+  font-size: 0.72rem;
+  letter-spacing: 0.03em;
+  line-height: 1.4;
+  pointer-events: none;
+  text-shadow: 0 1px 8px rgb(255 252 248 / 70%);
+}
+
+.stats {
+  position: absolute;
+  bottom: 1rem;
+  left: 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  max-width: min(52%, 22rem);
+  pointer-events: none;
+}
+
+.stats span {
+  padding: 0.42rem 0.68rem;
+  border: 1px solid rgb(105 75 70 / 12%);
+  border-radius: 999px;
+  color: #806966;
+  background: rgb(255 250 245 / 66%);
+  font-size: 0.68rem;
+  backdrop-filter: blur(12px);
+}
+
+/* Elegant memory selection card — feels like opening *my* journal. */
+.memorySelection {
+  position: absolute;
+  z-index: 3;
+  right: 1rem;
+  bottom: 1rem;
+  display: grid;
+  min-width: 13.5rem;
+  max-width: min(19rem, calc(100% - 2rem));
+  gap: 0.12rem;
+  padding: 1rem 1.05rem 0.95rem;
+  border: 1px solid rgb(146 91 103 / 24%);
+  border-radius: 1.2rem;
+  color: #55433f;
+  background:
+    linear-gradient(165deg, rgb(255 252 248 / 96%), rgb(255 246 242 / 92%));
+  box-shadow:
+    0 0.9rem 2.4rem rgb(91 56 54 / 14%),
+    0 0 0 1px rgb(255 255 255 / 40%) inset,
+    inset 0 1px rgb(255 255 255 / 80%);
+  backdrop-filter: blur(16px);
+}
+
+.memorySelectionKicker {
+  color: #9a7172;
+  font-size: 0.66rem;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.memorySelectionTitle {
+  margin: 0.12rem 0 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.18rem;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.22;
+  color: #4b3b38;
+}
+
+.memorySelectionOrdinal {
+  margin: 0.18rem 0 0;
+  color: #8a6568;
+  font-size: 0.72rem;
+  font-weight: 550;
+  letter-spacing: 0.02em;
+  line-height: 1.35;
+}
+
+.memorySelectionHint {
+  margin: 0.35rem 0 0;
+  color: #7d6863;
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.memorySelectionBond {
+  margin: 0.4rem 0 0;
+  padding-top: 0.4rem;
+  border-top: 1px solid rgb(146 91 103 / 14%);
+  color: #9a7172;
+  font-size: 0.68rem;
+  font-style: italic;
+  letter-spacing: 0.01em;
+  line-height: 1.4;
+}
+
+.memorySelectionClose {
+  min-height: 2.75rem;
+  margin-top: 0.6rem;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid rgb(117 83 78 / 18%);
+  border-radius: 999px;
+  color: #705a56;
+  background: #fffaf5;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    color 180ms ease;
+}
+
+.memorySelectionClose:hover {
+  border-color: rgb(174 112 123 / 40%);
+  background: #f8ecec;
+  color: #5f4542;
+}
+
+.memorySelectionClose:focus {
+  outline: none;
+}
+
+.memorySelectionClose:focus-visible {
+  outline: 3px solid rgb(160 104 116 / 40%);
+  outline-offset: 2px;
+}
+
+.controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  width: min(74rem, 100%);
+  margin: 1.2rem auto 0;
+}
+
+.controls > div {
+  padding: 1.05rem 1.1rem;
+  border: 1px solid rgb(116 83 78 / 12%);
+  border-radius: 1.25rem;
+  background: rgb(255 251 246 / 52%);
+  box-shadow: 0 0.4rem 1.4rem rgb(95 63 57 / 4%);
+}
+
+.controls div > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.viewControls {
+  margin-top: 0.65rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid rgb(116 83 78 / 10%);
+}
+
+.controls button {
+  min-height: 2.65rem;
+  padding: 0.62rem 0.9rem;
+  border: 1px solid rgb(117 83 78 / 17%);
+  border-radius: 999px;
+  color: #705a56;
+  background: rgb(255 253 249 / 78%);
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    background 180ms ease,
+    transform 180ms ease,
+    color 180ms ease;
+}
+
+.controls button:hover,
+.controls button[data-active] {
+  border-color: rgb(174 112 123 / 44%);
+  background: #f5dfe1;
+  transform: translateY(-1px);
+}
+
+.controls button[data-active] {
+  font-weight: 600;
+  color: #5f3f42;
+}
+
+.controls button:focus {
+  outline: none;
+}
+
+.controls button:focus-visible {
+  outline: 3px solid rgb(160 104 116 / 36%);
+  outline-offset: 2px;
+}
+
+.nurtureControls button:last-child {
+  color: #fff9f4;
+  border-color: #8d6266;
+  background: #8d6266;
+}
+
+.nurtureControls button:last-child:hover {
+  border-color: #7a5256;
+  background: #7a5256;
+  color: #fff9f4;
+}
+
+.privacyNote {
+  max-width: 36rem;
+  margin: 1.05rem auto 0.35rem;
+  color: #846f69;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .lab {
+    padding: 0.85rem;
+  }
+
+  .header {
+    top: 1.15rem;
+    left: 1.15rem;
+    right: 1.15rem;
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+    align-items: start;
+  }
+
+  .header h1 {
+    max-width: 14ch;
+    font-size: clamp(1.55rem, 7.2vw, 2.05rem);
+    line-height: 0.98;
+  }
+
+  .phaseCard {
+    display: none;
+  }
+
+  /* Life stage stays visible when the desktop card is hidden. */
+  .lifeStageInline {
+    display: block;
+  }
+
+  .intro {
+    display: none;
+  }
+
+  .stage {
+    height: max(38rem, calc(100dvh - 0.5rem));
+    border-radius: 1.45rem;
+  }
+
+  .controls {
+    grid-template-columns: 1fr;
+    margin-top: 0.95rem;
+    gap: 0.75rem;
+  }
+
+  .controls > div {
+    padding: 0.9rem;
+  }
+
+  .stats {
+    left: 0.7rem;
+    bottom: 2.55rem;
+    max-width: calc(100% - 1.4rem);
+  }
+
+  .memorySelection {
+    right: 0.7rem;
+    bottom: 0.7rem;
+    left: 0.7rem;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .stage[data-memory-selected="true"] .scene {
+    /* Room for richer memory petal card (ordinal + bond line + Clear). */
+    bottom: 11rem;
+  }
+
+  .stage[data-memory-selected="true"] .stats {
+    opacity: 0;
+  }
+
+  .stage[data-memory-selected="true"] .canvasHint {
+    opacity: 0;
+  }
+
+  .canvasHint {
+    /* Short mobile discoverability for orbit + tap. */
+    display: block;
+    right: 0.7rem;
+    left: 0.7rem;
+    bottom: 0.55rem;
+    font-size: 0.7rem;
+    text-align: center;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .controls button {
+    transition: none;
+  }
+
+  .controls button:hover,
+  .controls button[data-active] {
+    transform: none;
+  }
+
+  .memorySelectionClose {
+    transition: none;
+  }
+
+  /* Selection card stays; no motion chrome beyond static presence. */
+  .memorySelection {
+    box-shadow:
+      0 0.9rem 2.4rem rgb(91 56 54 / 14%),
+      inset 0 1px rgb(255 255 255 / 80%);
+  }
+}

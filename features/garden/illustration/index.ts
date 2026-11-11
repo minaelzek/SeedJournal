@@ -1,8 +1,4 @@
 export {
-  IllustratedSakura,
-  type IllustratedSakuraProps,
-} from "./IllustratedSakura";
-export {
   presentSakura,
   presentationAtSequence,
   morphIntentFromDelta,

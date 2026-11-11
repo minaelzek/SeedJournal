@@ -6,6 +6,7 @@ export {
 } from "./entries";
 export {
   createVault,
+  importVaultKeyFromBase64,
   MINIMUM_PASSPHRASE_LENGTH,
   normalizePassphrase,
   rewrapVault,

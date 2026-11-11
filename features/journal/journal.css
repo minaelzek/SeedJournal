@@ -1,13 +1,101 @@
 .sj-ritual {
+  --sj-paper-grain: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.13'/%3E%3C/svg%3E");
+  --sj-ink-rule: color-mix(in srgb, var(--color-blossom-shadow) 38%, var(--color-border));
   position: relative;
   min-height: 100dvh;
   width: 100%;
   overflow-x: hidden;
   color: var(--color-text-primary);
+  /* Glass paper film — companion stays readable through soft wash; writing stays private. */
   background:
-    radial-gradient(circle at 50% -8%, rgb(255 255 255 / 88%), transparent 38rem),
-    color-mix(in srgb, var(--color-surface) 94%, transparent);
-  backdrop-filter: blur(1.25rem) saturate(0.86);
+    radial-gradient(circle at 50% -8%, rgb(255 255 255 / 36%), transparent 38rem),
+    color-mix(in srgb, var(--color-surface) 42%, transparent);
+  backdrop-filter: blur(0.9rem) saturate(0.9);
+  animation: sj-ritual-fade var(--sj-motion-stage, 320ms) var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+
+.sj-ritual[data-stage="new"] {
+  background:
+    radial-gradient(circle at 50% -8%, rgb(255 255 255 / 28%), transparent 38rem),
+    color-mix(in srgb, var(--color-surface) 32%, transparent);
+}
+
+.sj-ritual[data-stage="writing"] {
+  background:
+    radial-gradient(circle at 50% 10%, rgb(255 255 255 / 40%), transparent 36rem),
+    color-mix(in srgb, var(--color-surface) 48%, transparent);
+}
+
+.sj-ritual[data-stage="reflection-offered"],
+.sj-ritual[data-stage="second-reflection-offered"] {
+  background:
+    radial-gradient(circle at 42% 0%, rgb(255 248 246 / 34%), transparent 34rem),
+    color-mix(in srgb, var(--color-surface) 40%, transparent);
+}
+
+.sj-ritual[data-stage="follow-up-answered"],
+.sj-ritual[data-stage="follow-up-skipped"],
+.sj-ritual[data-stage="second-reflection-answered"],
+.sj-ritual[data-stage="second-reflection-skipped"],
+.sj-ritual[data-stage="seed-insight-added"],
+.sj-ritual[data-stage="seed-insight-skipped"],
+.sj-ritual[data-stage="nurtured"] {
+  background:
+    radial-gradient(circle at 50% 100%, rgb(255 255 255 / 22%), transparent 30rem),
+    color-mix(in srgb, var(--color-surface) 50%, transparent);
+}
+
+@keyframes sj-ritual-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sj-ritual-breath {
+  from {
+    opacity: 0;
+    transform: translateY(0.7rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sj-ritual-focus {
+  from {
+    opacity: 0;
+    transform: translateY(0.35rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sj-ritual-heard {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sj-ritual-close {
+  from {
+    opacity: 0;
+    transform: translateY(-0.22rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .sj-ritual::before {
@@ -17,7 +105,7 @@
   z-index: 0;
   pointer-events: none;
   opacity: 0.24;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 160 160' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.13'/%3E%3C/svg%3E");
+  background-image: var(--sj-paper-grain);
   mix-blend-mode: soft-light;
 }
 
@@ -70,7 +158,7 @@
   min-width: 7.25rem;
   display: grid;
   justify-items: center;
-  gap: 0.38rem;
+  gap: 0.42rem;
 }
 
 .sj-ritual-progress__label {
@@ -83,30 +171,79 @@
 }
 
 .sj-ritual-progress__dots {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  justify-content: space-between;
+  width: 4.35rem;
+}
+
+.sj-ritual-progress__dots::before,
+.sj-ritual-progress__dots::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0.28rem;
+  height: 1px;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.sj-ritual-progress__dots::before {
+  right: 0.28rem;
+  background: color-mix(in srgb, var(--sj-color-trunk) 22%, transparent);
+}
+
+.sj-ritual-progress__dots::after {
+  width: 0.2rem;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--sj-color-trunk) 38%, var(--sj-color-leaf)),
+    color-mix(in srgb, var(--sj-color-leaf) 62%, var(--sj-color-blossom))
+  );
+  transition: width var(--sj-motion-surface, 320ms) var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1));
+}
+
+.sj-ritual-progress[data-step="0"] .sj-ritual-progress__dots::after {
+  width: 0.35rem;
+}
+
+.sj-ritual-progress[data-step="1"] .sj-ritual-progress__dots::after {
+  width: 1.9rem;
+}
+
+.sj-ritual-progress[data-step="2"] .sj-ritual-progress__dots::after {
+  width: 3.8rem;
 }
 
 .sj-ritual-progress__dots i {
-  width: 1.25rem;
-  height: 0.2rem;
+  position: relative;
+  z-index: 1;
+  width: 0.42rem;
+  height: 0.42rem;
   display: block;
-  overflow: hidden;
-  border-radius: 99px;
-  background: color-mix(in srgb, var(--sj-color-text) 11%, transparent);
-  transition: background-color var(--sj-motion-hover, 160ms) ease,
-    width var(--sj-motion-hover, 160ms) ease;
+  border-radius: 62% 48% 58% 50%;
+  background: color-mix(in srgb, var(--color-surface) 70%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sj-color-text) 16%, transparent);
+  transition:
+    background-color var(--sj-motion-hover, 160ms) ease,
+    box-shadow var(--sj-motion-hover, 160ms) ease,
+    width var(--sj-motion-hover, 160ms) ease,
+    height var(--sj-motion-hover, 160ms) ease;
 }
 
 .sj-ritual-progress__dots i[data-state="done"] {
-  background: color-mix(in srgb, var(--sj-color-leaf) 72%, var(--sj-color-text));
+  width: 0.5rem;
+  height: 0.5rem;
+  background: color-mix(in srgb, var(--sj-color-blossom) 58%, var(--sj-color-leaf));
+  box-shadow: 0 0 0.35rem color-mix(in srgb, var(--sj-color-blossom) 24%, transparent);
 }
 
 .sj-ritual-progress__dots i[data-state="active"] {
-  width: 1.55rem;
+  width: 0.62rem;
+  height: 0.62rem;
   background: var(--sj-color-leaf);
-  box-shadow: 0 0 0.55rem color-mix(in srgb, var(--sj-color-leaf) 28%, transparent);
+  box-shadow: 0 0 0.55rem color-mix(in srgb, var(--sj-color-leaf) 32%, transparent);
 }
 
 .sj-ritual-save {
@@ -130,7 +267,51 @@
 
 .sj-ritual-step {
   width: 100%;
-  animation: sj-ritual-enter 420ms var(--ease-enter) both;
+}
+
+.sj-ritual-step--opening {
+  animation: sj-ritual-breath 560ms var(--sj-ease-enter, var(--ease-enter)) both;
+}
+
+.sj-ritual-step--opening .sj-ritual-kicker {
+  animation: sj-ritual-fade 380ms ease both;
+}
+
+.sj-ritual-step--opening h1 {
+  animation: sj-ritual-breath 640ms var(--sj-ease-enter, var(--ease-enter)) 40ms both;
+}
+
+.sj-ritual-step--writing {
+  animation: sj-ritual-fade 280ms ease both;
+}
+
+.sj-ritual-step--writing .sj-ritual-prompt {
+  animation: sj-ritual-fade 360ms ease both;
+}
+
+.sj-ritual-step--writing .sj-writing-canvas {
+  animation: sj-ritual-focus 460ms var(--sj-ease-enter, var(--ease-enter)) 40ms both;
+}
+
+.sj-ritual-step--follow-up {
+  animation: sj-ritual-fade 240ms ease both;
+}
+
+.sj-ritual-step--follow-up .sj-ritual-kicker {
+  animation: sj-ritual-fade 360ms ease both;
+}
+
+.sj-ritual-step--follow-up h1 {
+  animation: sj-ritual-heard 560ms var(--sj-ease-enter, var(--ease-enter)) 50ms both;
+}
+
+.sj-ritual-step--follow-up .sj-writing-well {
+  animation: sj-ritual-focus 480ms var(--sj-ease-enter, var(--ease-enter)) 110ms both;
+}
+
+.sj-ritual-step--insight,
+.sj-ritual-step--nurtured {
+  animation: sj-ritual-close 420ms var(--sj-ease-enter, var(--ease-enter)) both;
 }
 
 .sj-ritual-step h1,
@@ -275,7 +456,7 @@
   color: var(--color-text-primary);
   border-color: color-mix(in srgb, var(--color-blossom) 68%, var(--color-border));
   background: color-mix(in srgb, var(--color-blossom) 9%, white);
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 55%);
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%);
 }
 
 .sj-ritual-actions {
@@ -299,12 +480,16 @@
   line-height: 1.2;
   cursor: pointer;
   transition:
-    color var(--motion-interface) ease,
+    color var(--motion-interface) var(--sj-ease-press, ease),
     opacity var(--motion-interface) ease,
     background-color var(--motion-interface) ease,
     border-color var(--motion-interface) ease,
     box-shadow var(--motion-interface) ease,
-    transform var(--motion-press) ease;
+    transform var(--motion-press) var(--sj-ease-press, ease);
+}
+
+.sj-ritual-button:active:not(:disabled) {
+  transform: scale(var(--sj-press-scale, 0.97));
 }
 
 .sj-ritual-button--primary {
@@ -348,37 +533,128 @@
   transform: none;
 }
 
-.sj-ritual-prompt {
-  margin-bottom: clamp(1.5rem, 4vh, 2.5rem);
-  font-size: clamp(1.55rem, 4vw, 2.35rem);
-  line-height: 1.16;
+.sj-ritual-step--writing .sj-ritual-prompt {
+  max-width: 36rem;
+  margin-bottom: clamp(1.1rem, 3vh, 1.75rem);
+  color: color-mix(in srgb, var(--color-text-primary) 68%, var(--color-text-secondary));
+  font-size: clamp(1.05rem, 2.4vw, 1.28rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.sj-writing-canvas,
+.sj-writing-well {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(rgb(255 253 249 / 52%), rgb(255 253 249 / 34%)),
+    color-mix(in srgb, var(--color-surface) 58%, transparent);
+  box-shadow:
+    0 1rem 2.8rem rgb(74 60 49 / 5%),
+    inset 1px 0 0 rgb(255 255 255 / 42%);
+}
+
+.sj-writing-canvas::before,
+.sj-writing-well::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.28;
+  background-image: var(--sj-paper-grain);
+  mix-blend-mode: soft-light;
+}
+
+.sj-writing-canvas::after,
+.sj-writing-well::after {
+  content: "";
+  position: absolute;
+  top: 0.85rem;
+  bottom: 0.85rem;
+  left: 0;
+  width: 2px;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    transparent,
+    var(--sj-ink-rule) 12%,
+    color-mix(in srgb, var(--color-blossom) 42%, var(--sj-ink-rule)) 50%,
+    var(--sj-ink-rule) 88%,
+    transparent
+  );
 }
 
 .sj-writing-canvas {
-  position: relative;
-  padding: clamp(1.25rem, 4vw, 2rem);
-  border: 1px solid color-mix(in srgb, var(--color-border) 86%, transparent);
-  border-radius: clamp(1.25rem, 4vw, 1.75rem);
-  background:
-    linear-gradient(rgb(255 255 255 / 42%), rgb(255 255 255 / 24%)),
-    var(--color-surface);
-  box-shadow:
-    0 1.5rem 4rem rgb(74 60 49 / 6%),
-    inset 0 1px 0 rgb(255 255 255 / 70%);
-  transition:
-    border-color var(--motion-interface) ease,
-    box-shadow var(--motion-interface) ease;
+  padding: clamp(1.35rem, 4vw, 2.1rem) clamp(1.25rem, 4vw, 2rem) clamp(1.15rem, 3vw, 1.6rem);
 }
 
 .sj-writing-canvas:focus-within {
-  border-color: color-mix(in srgb, var(--color-focus) 34%, var(--color-border));
+  background:
+    linear-gradient(rgb(255 253 249 / 62%), rgb(255 253 249 / 42%)),
+    color-mix(in srgb, var(--color-surface) 64%, transparent);
   box-shadow:
-    0 1.5rem 4rem rgb(74 60 49 / 7%),
-    0 0 0 0.22rem color-mix(in srgb, var(--color-focus) 5%, transparent),
-    inset 0 1px 0 rgb(255 255 255 / 74%);
+    0 1.15rem 3rem rgb(74 60 49 / 6%),
+    inset 1px 0 0 rgb(255 255 255 / 50%);
+}
+
+.sj-writing-canvas:focus-within::after {
+  background: linear-gradient(
+    180deg,
+    transparent,
+    color-mix(in srgb, var(--color-blossom-shadow) 62%, var(--color-border)) 14%,
+    color-mix(in srgb, var(--color-blossom) 58%, var(--color-blossom-shadow)) 50%,
+    color-mix(in srgb, var(--color-blossom-shadow) 62%, var(--color-border)) 86%,
+    transparent
+  );
+}
+
+.sj-writing-canvas .w-full > div:first-child {
+  margin-bottom: 0.7rem;
+}
+
+.sj-writing-canvas label[for="journal-title"] {
+  margin-bottom: 0.2rem;
+  color: color-mix(in srgb, var(--color-text-secondary) 72%, transparent);
+  font-size: 0.64rem;
+  font-weight: 550;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.sj-writing-canvas label[for="journal-title"]::after {
+  content: " · optional";
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-weight: 450;
+}
+
+.sj-writing-canvas #journal-title {
+  min-height: 2.15rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: color-mix(in srgb, var(--color-text-primary) 74%, var(--color-text-secondary));
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+}
+
+.sj-writing-canvas #journal-title::placeholder {
+  color: color-mix(in srgb, var(--color-text-secondary) 52%, transparent);
+}
+
+.sj-writing-canvas #journal-title:focus,
+.sj-writing-canvas #journal-title:focus-visible {
+  border: 0;
+  box-shadow: none;
+  outline: none;
 }
 
 .sj-writing-canvas textarea {
+  position: relative;
   min-height: clamp(15rem, 40vh, 24rem);
   font-size: clamp(1.08rem, 2.2vw, 1.28rem);
   line-height: 1.68;
@@ -394,16 +670,10 @@
   min-height: 1.5rem;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
   margin-top: 1rem;
   color: var(--color-text-secondary);
   font-size: 0.72rem;
   line-height: 1.4;
-}
-
-.sj-writing-canvas__footer span:last-child {
-  flex: 0 0 auto;
 }
 
 .sj-ritual-threads {
@@ -462,7 +732,35 @@
   background: color-mix(in srgb, var(--color-text-primary) 5%, transparent);
 }
 
+.sj-ritual-heard {
+  max-width: 42rem;
+}
+
+.sj-ritual-step--follow-up[data-from-scene] .sj-ritual-kicker {
+  color: color-mix(in srgb, var(--color-blossom-shadow) 62%, var(--color-text-secondary));
+}
+
+.sj-ritual-step--follow-up[data-from-scene] h1 {
+  padding-left: 0.95rem;
+  border-left: 1px solid var(--sj-ink-rule);
+}
+
+.sj-writing-well {
+  margin-top: 1.75rem;
+  padding: clamp(1.15rem, 3.4vw, 1.65rem) clamp(1.1rem, 3vw, 1.55rem);
+}
+
+.sj-writing-well--quiet {
+  margin-top: 1.35rem;
+  padding: 0.95rem 1.1rem;
+  background:
+    linear-gradient(rgb(255 253 249 / 36%), rgb(255 253 249 / 22%)),
+    color-mix(in srgb, var(--color-surface) 42%, transparent);
+  box-shadow: inset 1px 0 0 rgb(255 255 255 / 28%);
+}
+
 .sj-ritual-textarea {
+  position: relative;
   width: 100%;
   min-height: 12rem;
   margin-top: 2rem;
@@ -483,10 +781,27 @@
     box-shadow var(--motion-interface) ease;
 }
 
+.sj-writing-well .sj-ritual-textarea {
+  min-height: 13rem;
+  margin-top: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .sj-ritual-textarea:focus {
   border-color: color-mix(in srgb, var(--color-focus) 62%, transparent);
   background: rgb(255 255 255 / 62%);
   box-shadow: 0 0 0 0.25rem color-mix(in srgb, var(--color-focus) 8%, transparent);
+}
+
+.sj-writing-well .sj-ritual-textarea:focus,
+.sj-writing-well .sj-ritual-textarea:focus-visible {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
 }
 
 .sj-ritual-textarea::placeholder {
@@ -494,7 +809,21 @@
 }
 
 .sj-ritual-textarea--insight {
-  min-height: 8.5rem;
+  min-height: 7.25rem;
+}
+
+.sj-ritual-step--insight {
+  max-width: 32rem;
+}
+
+.sj-ritual-step--insight h1 {
+  font-size: clamp(1.5rem, 3.8vw, 2.15rem);
+  letter-spacing: -0.03em;
+  line-height: 1.18;
+}
+
+.sj-ritual-step--insight .sj-ritual-reassurance {
+  font-size: 0.88rem;
 }
 
 .sj-return-bud-choice {
@@ -581,17 +910,22 @@
 }
 
 .sj-ritual-step--nurtured {
-  max-width: 34rem;
+  max-width: 30rem;
   margin-inline: auto;
   text-align: center;
 }
 
+.sj-ritual-step--nurtured h1 {
+  font-size: clamp(1.55rem, 4vw, 2.25rem);
+  letter-spacing: -0.03em;
+}
+
 .sj-ritual-grown-mark {
-  width: 4.25rem;
-  height: 4.25rem;
+  width: 3.6rem;
+  height: 3.6rem;
   display: grid;
   place-items: center;
-  margin: 0 auto 1.5rem;
+  margin: 0 auto 1.25rem;
   border: 1px solid color-mix(in srgb, var(--sj-color-leaf) 38%, transparent);
   border-radius: 50%;
   color: var(--sj-color-leaf);
@@ -599,7 +933,7 @@
     radial-gradient(circle at 35% 28%, rgb(255 255 255 / 70%), transparent 48%),
     color-mix(in srgb, var(--sj-color-leaf) 10%, white);
   box-shadow:
-    0 0 0 0.8rem color-mix(in srgb, var(--sj-color-leaf) 5%, transparent),
+    0 0 0 0.65rem color-mix(in srgb, var(--sj-color-leaf) 5%, transparent),
     0 0.75rem 2rem color-mix(in srgb, var(--sj-color-void) 8%, transparent);
 }
 
@@ -615,18 +949,12 @@
   margin-top: 2.35rem;
 }
 
-@keyframes sj-ritual-enter {
-  from {
-    opacity: 0;
-    transform: translateY(0.65rem);
-  }
-}
-
 @media (max-width: 40rem) {
-  .sj-ritual {
+  .sj-ritual,
+  .sj-ritual[data-stage] {
     background:
-      radial-gradient(circle at 50% -4%, rgb(255 255 255 / 82%), transparent 25rem),
-      color-mix(in srgb, var(--color-surface) 97%, transparent);
+      radial-gradient(circle at 50% -4%, rgb(255 255 255 / 44%), transparent 24rem),
+      color-mix(in srgb, var(--color-surface) 48%, transparent);
   }
 
   .sj-ritual__shell {
@@ -650,6 +978,15 @@
     letter-spacing: -0.05em;
   }
 
+  .sj-ritual-step--writing .sj-ritual-prompt {
+    font-size: clamp(1.02rem, 4.4vw, 1.18rem);
+  }
+
+  .sj-ritual-step--insight h1,
+  .sj-ritual-step--nurtured h1 {
+    font-size: clamp(1.45rem, 7vw, 1.9rem);
+  }
+
   .sj-ritual-step__intro {
     margin-bottom: 2rem;
   }
@@ -668,7 +1005,7 @@
     padding: 0.55rem;
     border: 1px solid color-mix(in srgb, var(--color-border) 76%, transparent);
     border-radius: 1.5rem;
-    background: color-mix(in srgb, var(--color-surface) 89%, transparent);
+    background: color-mix(in srgb, var(--color-surface) 78%, transparent);
     box-shadow: 0 0.75rem 2.75rem rgb(74 60 49 / 14%);
     backdrop-filter: blur(1.25rem) saturate(1.1);
   }
@@ -681,25 +1018,27 @@
     min-height: 2.75rem;
   }
 
-  .sj-ritual-prompt {
-    font-size: clamp(1.45rem, 6.5vw, 1.9rem);
-  }
-
   .sj-writing-canvas {
     margin-inline: -0.35rem;
-    padding: 1.25rem;
+    padding: 1.25rem 1.15rem 1.1rem;
   }
 
   .sj-writing-canvas textarea {
     min-height: 17rem;
   }
 
-  .sj-writing-canvas__footer {
-    align-items: flex-end;
+  .sj-writing-well {
+    margin-inline: -0.2rem;
   }
 
+  .sj-writing-well .sj-ritual-textarea,
   .sj-ritual-textarea {
     min-height: 14rem;
+  }
+
+  .sj-ritual-textarea--insight,
+  .sj-writing-well--quiet .sj-ritual-textarea {
+    min-height: 8rem;
   }
 }
 
@@ -716,7 +1055,563 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .sj-ritual-step {
-    animation: none;
+  .sj-ritual,
+  .sj-ritual-step,
+  .sj-ritual-step--opening,
+  .sj-ritual-step--opening .sj-ritual-kicker,
+  .sj-ritual-step--opening h1,
+  .sj-ritual-step--writing,
+  .sj-ritual-step--writing .sj-ritual-prompt,
+  .sj-ritual-step--writing .sj-writing-canvas,
+  .sj-ritual-step--follow-up,
+  .sj-ritual-step--follow-up .sj-ritual-kicker,
+  .sj-ritual-step--follow-up h1,
+  .sj-ritual-step--follow-up .sj-writing-well,
+  .sj-ritual-step--insight,
+  .sj-ritual-step--nurtured,
+  .sj-ritual-progress__dots::after {
+    animation: sj-ritual-fade 150ms ease both;
+    transition-duration: 150ms;
+    transform: none;
+  }
+}
+
+/* One-page conversation. The tree stays in the garden layer; this card rises under it. */
+.sj-converse__veil {
+  position: fixed;
+  z-index: 5;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: min(28dvh, 16rem);
+  pointer-events: none;
+  background: linear-gradient(
+    to top,
+    color-mix(in srgb, var(--sj-color-void) 28%, transparent),
+    transparent
+  );
+}
+
+.sj-converse {
+  --sj-converse-limit: min(34dvh, 18.5rem);
+  position: fixed;
+  z-index: 25;
+  left: 50%;
+  right: auto;
+  top: auto;
+  bottom: var(--sj-converse-lift, 0px);
+  box-sizing: border-box;
+  width: min(40rem, 100%);
+  max-height: var(--sj-converse-limit);
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.85rem 1rem 0.9rem;
+  border: 1px solid color-mix(in srgb, var(--sj-color-border) 88%, transparent);
+  border-bottom: 0;
+  border-radius: 1.35rem 1.35rem 0 0;
+  padding-bottom: max(0.9rem, env(safe-area-inset-bottom));
+  color: var(--sj-color-text);
+  background: rgb(255 253 249 / 96%);
+  box-shadow:
+    0 0.65rem 2rem color-mix(in srgb, var(--sj-color-void) 12%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 52%);
+  backdrop-filter: blur(1.1rem) saturate(1.06);
+  pointer-events: auto;
+  overflow: hidden;
+  cursor: text;
+}
+
+.sj-converse[data-phase="writing"],
+.sj-converse[data-phase="listening"] {
+  --sj-converse-limit: min(40dvh, 22rem);
+}
+
+/* Keyboard only. A closed keyboard must stay at the phase cap so the crown remains visible. */
+.sj-converse[data-keyboard="open"] {
+  --sj-converse-limit: var(--sj-converse-above, min(40dvh, 22rem));
+}
+
+.sj-converse__scroll {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  flex: 1 1 auto;
+  padding-right: 0.1rem;
+}
+
+.sj-converse__sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sj-converse__bar,
+.sj-converse__composer,
+.sj-converse__actions,
+.sj-converse__listening,
+.sj-converse__dictate-note {
+  flex-shrink: 0;
+}
+
+/* Entrance must keep translateX(-50%); that offset is what centers the fixed card. */
+.sj-app-frame__content > .sj-converse {
+  animation: sj-converse-in 560ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sj-app-frame__content > .sj-converse__veil {
+  animation: sj-converse-veil 420ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes sj-converse-in {
+  from {
+    opacity: 0.4;
+    transform: translateX(-50%) translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes sj-converse-veil {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sj-converse-offer {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sj-converse-save-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sj-converse-save-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes sj-converse-mic {
+  0%,
+  100% {
+    opacity: 0.72;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.04);
+  }
+}
+
+.sj-converse__bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  min-height: 2.75rem;
+}
+
+.sj-converse__close {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: grid;
+  place-items: center;
+  margin-left: -0.35rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--sj-color-text-muted);
+  background: transparent;
+  cursor: pointer;
+}
+
+.sj-converse__close:hover {
+  color: var(--sj-color-text);
+  background: color-mix(in srgb, var(--sj-color-text) 5%, transparent);
+}
+
+.sj-converse__close:focus-visible,
+.sj-converse__mic:focus-visible,
+.sj-converse__fresh:focus-visible,
+.sj-converse__leave:focus-visible,
+.sj-converse__quiet:focus-visible,
+.sj-converse__field:focus-visible,
+.sj-converse__carry input:focus-visible {
+  outline: 2px solid var(--sj-color-focus, var(--color-focus));
+  outline-offset: 3px;
+}
+
+.sj-converse__field:focus-visible {
+  outline: none;
+  box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--sj-color-leaf) 70%, transparent);
+}
+
+.sj-converse__save {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 1.35em;
+  margin: 0;
+  overflow: hidden;
+  color: var(--sj-color-text-muted);
+  font-family: var(--sj-font-ui);
+  font-size: 0.75rem;
+  line-height: 1.35;
+  text-align: right;
+}
+
+.sj-converse__save-line,
+.sj-converse__save-line--out {
+  position: absolute;
+  inset: 0 0 auto 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.sj-converse__save-line {
+  animation: sj-converse-save-in 320ms ease both;
+}
+
+.sj-converse__save-line--out {
+  animation: sj-converse-save-out 320ms ease both;
+  pointer-events: none;
+}
+
+.sj-converse__thread {
+  min-height: 0;
+  max-height: none;
+  overflow: visible;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  flex: 0 0 auto;
+}
+
+.sj-converse__thread + .sj-converse__ask,
+.sj-converse__composer + .sj-converse__ask {
+  margin-top: 0.85rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid color-mix(in srgb, var(--sj-color-border) 85%, transparent);
+}
+
+.sj-converse__prompt {
+  margin: 0;
+  font-family: var(--sj-font-poetic);
+  font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 1.35;
+  text-wrap: pretty;
+  overflow: visible;
+}
+
+.sj-converse__ask {
+  display: block;
+  flex-shrink: 0;
+  margin: 0;
+  cursor: pointer;
+  overflow: visible;
+  animation: sj-converse-offer 360ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  font-family: var(--sj-font-ui);
+  font-size: 0.9375rem;
+  font-weight: 400;
+  letter-spacing: -0.011em;
+  line-height: 1.45;
+  text-wrap: pretty;
+  color: var(--sj-color-text-muted);
+}
+
+.sj-turn {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  max-width: min(100%, 28rem);
+}
+
+.sj-turn--you {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.sj-turn--seed {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.sj-turn__who {
+  font-family: var(--sj-font-ui);
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sj-color-text-muted);
+}
+
+.sj-converse__hint {
+  margin: 0.15rem 0 0;
+  color: var(--sj-color-text-muted);
+  font-family: var(--sj-font-ui);
+  font-size: 0.78rem;
+  line-height: 1.4;
+}
+
+.sj-converse__said {
+  margin: 0;
+  padding: 0.65rem 0.8rem;
+  border-radius: 1rem 1rem 0.3rem 1rem;
+  background: color-mix(in srgb, var(--sj-color-leaf) 12%, white);
+  color: var(--sj-color-text);
+  font-family: var(--sj-font-poetic);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+}
+
+.sj-turn--seed .sj-converse__ask {
+  padding: 0.7rem 0.85rem;
+  border-radius: 1rem 1rem 1rem 0.3rem;
+  background: rgb(255 253 249);
+  border: 1px solid color-mix(in srgb, var(--sj-color-border) 80%, transparent);
+  color: var(--sj-color-text);
+}
+
+.sj-converse__scroll > .sj-converse__ask {
+  padding-bottom: 0.85rem;
+}
+
+.sj-converse__composer {
+  margin-top: 0.2rem;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0.35rem 0.5rem;
+  align-items: end;
+}
+
+.sj-converse__composer:has(.sj-converse__mic) {
+  grid-template-columns: minmax(0, 1fr) 2.75rem;
+}
+
+.sj-converse__field {
+  grid-column: 1;
+  grid-row: 1;
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 2.75rem;
+  max-height: 8.5rem;
+  resize: none;
+  overflow: auto;
+  border: 0;
+  background: transparent;
+  color: var(--sj-color-text);
+  caret-color: var(--sj-color-blossom);
+  font-family: var(--sj-font-poetic);
+  font-size: 1.0625rem;
+  line-height: 1.55;
+  pointer-events: auto;
+}
+
+.sj-converse__field--answer {
+  padding-top: 0.15rem;
+  border-top: 0;
+}
+
+.sj-converse__mic {
+  grid-column: 2;
+  grid-row: 1;
+  z-index: 2;
+  width: 2.75rem;
+  height: 2.75rem;
+  display: grid;
+  place-items: center;
+  align-self: end;
+  border: 1px solid var(--sj-color-border);
+  border-radius: 999px;
+  color: var(--sj-color-text);
+  background: color-mix(in srgb, var(--sj-color-surface) 70%, transparent);
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.sj-converse__mic[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--sj-color-leaf) 70%, var(--sj-color-border));
+  color: var(--sj-color-leaf);
+}
+
+.sj-converse[data-phase="listening"] .sj-converse__mic {
+  animation: sj-converse-mic 1.8s ease-in-out infinite;
+}
+
+.sj-converse__listening,
+.sj-converse__dictate-note,
+.sj-converse__resumed {
+  margin: 0;
+  color: var(--sj-color-text-muted);
+  font-family: var(--sj-font-ui);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.sj-converse__resumed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem 0.75rem;
+}
+
+.sj-converse__fresh {
+  min-height: 2.75rem;
+  padding: 0 0.2rem;
+  border: 0;
+  background: transparent;
+  color: var(--sj-color-text);
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sj-converse__carry {
+  display: grid;
+  gap: 0.2rem;
+  margin: 0;
+  color: var(--sj-color-text-muted);
+  font-family: var(--sj-font-ui);
+  font-size: 0.75rem;
+}
+
+.sj-converse__carry input,
+.sj-converse__carry-line {
+  display: block;
+  min-height: 2.75rem;
+  width: 100%;
+  margin: 0.35rem 0 0;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--sj-color-border) 80%, transparent);
+  background: transparent;
+  color: var(--sj-color-text);
+  font-family: var(--sj-font-poetic);
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.sj-converse__carry input:focus-visible,
+.sj-converse__carry-line:focus-visible {
+  border-bottom-color: color-mix(in srgb, var(--sj-color-leaf) 70%, transparent);
+}
+
+.sj-converse__actions {
+  display: flex;
+  flex: 0 0 auto;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.4rem;
+  position: relative;
+  z-index: 2;
+  pointer-events: auto;
+}
+
+.sj-converse__quiet {
+  min-height: 2.75rem;
+  padding: 0 0.85rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--sj-color-text-muted);
+  background: transparent;
+  font-family: var(--sj-font-ui);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sj-converse__quiet:hover {
+  color: var(--sj-color-text);
+}
+
+.sj-converse__leave {
+  min-height: 2.75rem;
+  padding: 0 1.1rem;
+  border: 0;
+  border-radius: 999px;
+  color: var(--sj-color-blossom-light);
+  background: var(--sj-color-text);
+  font-family: var(--sj-font-ui);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+}
+
+.sj-converse__leave:not(:disabled) {
+  background: color-mix(in srgb, var(--sj-color-text) 84%, white);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 24%),
+    0 0.3rem 0.85rem color-mix(in srgb, var(--sj-color-text) 14%, transparent);
+}
+
+.sj-converse__leave:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sj-converse,
+  .sj-app-frame__content > .sj-converse,
+  .sj-app-frame__content > .sj-converse__veil,
+  .sj-converse__ask,
+  .sj-converse__save-line,
+  .sj-converse__save-line--out,
+  .sj-converse[data-phase="listening"] .sj-converse__mic {
+    animation: none !important;
+  }
+
+  .sj-converse,
+  .sj-app-frame__content > .sj-converse {
+    transform: translateX(-50%) translateY(0) !important;
+  }
+
+  .sj-converse__ask,
+  .sj-converse[data-phase="listening"] .sj-converse__mic {
+    transform: none;
+  }
+
+  .sj-converse__save-line--out {
+    display: none;
   }
 }

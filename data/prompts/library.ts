@@ -136,8 +136,16 @@ export const FOLLOW_UP_PROMPTS: Readonly<
     {
       text: "If you described only what a camera could have seen, what would be there?",
     },
+    {
+      text: "Which ordinary detail is still asking to be named?",
+    },
   ]),
   emotion: followUps("emotion", [
+    {
+      text: "What made that feeling true — a person, a moment, or a relief?",
+      anchoredText:
+        "What made “{anchor}” feel that way — a person, a moment, or a relief?",
+    },
     {
       text: "What feeling was underneath your first reaction?",
       anchoredText: "What feeling comes closest when you sit with “{anchor}”?",
@@ -156,6 +164,12 @@ export const FOLLOW_UP_PROMPTS: Readonly<
     },
     {
       text: "What word feels more precise than simply good, bad, or fine?",
+    },
+    {
+      text: "If you stay with the feeling for one more breath, what else is there?",
+    },
+    {
+      text: "What about this feeling is still sitting with you?",
     },
   ]),
   meaning: followUps("meaning", [
@@ -177,6 +191,9 @@ export const FOLLOW_UP_PROMPTS: Readonly<
     },
     {
       text: "If this moment had something to teach you, what might it be?",
+    },
+    {
+      text: "What would feel even a little truer than the first sentence you wrote?",
     },
   ]),
   perspective: followUps("perspective", [
@@ -200,6 +217,9 @@ export const FOLLOW_UP_PROMPTS: Readonly<
     {
       text: "How might this look from the other side of the moment?",
     },
+    {
+      text: "What do you wish someone had understood about this without you explaining?",
+    },
   ]),
   integration: followUps("integration", [
     {
@@ -221,6 +241,9 @@ export const FOLLOW_UP_PROMPTS: Readonly<
     {
       text: "What can remain unresolved, and what are you ready to act on?",
     },
+    {
+      text: "What would taking care of yourself look like with this still in the room?",
+    },
   ]),
   deepen: followUps("deepen", [
     {
@@ -241,6 +264,12 @@ export const FOLLOW_UP_PROMPTS: Readonly<
     },
     {
       text: "What has shifted between your first sentence and this one?",
+    },
+    {
+      text: "What would feel even 5% truer than the first sentence you wrote?",
+    },
+    {
+      text: "What do you wish someone had understood about what you just wrote?",
     },
   ]),
   "language-neutral": followUps("language-neutral", [

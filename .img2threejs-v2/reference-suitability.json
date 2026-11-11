@@ -1,0 +1,16 @@
+{
+  "verdict": "conditional-pass",
+  "reason": "The v2 concept has one obvious, large, high-resolution Sakura target with a strong authored silhouette and visible material language. It is an organic single view, so rear topology and exact depth must be inferred and verified from multi-angle renders. The user explicitly accepts stylized low-poly reconstruction rather than exact mesh extraction.",
+  "strengths": [
+    "single isolated target",
+    "clear rooted trunk and crown silhouette",
+    "major branch, bark, blossom, leaf, and ground materials are visible",
+    "procedural curve, tube, instancing, and faceted-material reconstruction is feasible"
+  ],
+  "conditions": [
+    "treat the reference as art direction rather than literal tracing",
+    "invent a restrained rear crown and verify front, three-quarter, side, and rear views",
+    "require visual approval of the leafless silhouette before blossom density is added",
+    "report inferred material and hidden-side decisions explicitly"
+  ]
+}

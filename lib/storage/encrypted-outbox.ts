@@ -89,17 +89,37 @@ export async function listEncryptedDrafts(
   accountId: string,
 ): Promise<EncryptedEntryEnvelope[]> {
   const database = await openDatabase();
-  const drafts = await requestToPromise<StoredDraft[]>(
-    database
-      .transaction(DRAFT_STORE, "readonly")
-      .objectStore(DRAFT_STORE)
-      .index("byAccount")
-      .getAll(IDBKeyRange.only(accountId)),
-  );
-  database.close();
-  return drafts
-    .sort((left, right) => left.storedAt - right.storedAt)
-    .map((draft) => draft.envelope);
+  try {
+    const transaction = database.transaction(
+      [DRAFT_STORE, OUTBOX_STORE],
+      "readonly",
+    );
+    const [drafts, operations] = await Promise.all([
+      requestToPromise<StoredDraft[]>(
+        transaction
+          .objectStore(DRAFT_STORE)
+          .index("byAccount")
+          .getAll(IDBKeyRange.only(accountId)),
+      ),
+      requestToPromise<EncryptedOutboxOperation[]>(
+        transaction
+          .objectStore(OUTBOX_STORE)
+          .index("byAccount")
+          .getAll(IDBKeyRange.only(accountId)),
+      ),
+    ]);
+    const pendingDeletes = new Set(
+      operations
+        .filter((operation) => operation.kind === "delete")
+        .map((operation) => operation.entryId),
+    );
+    return drafts
+      .sort((left, right) => left.storedAt - right.storedAt)
+      .filter((draft) => !pendingDeletes.has(draft.envelope.id))
+      .map((draft) => draft.envelope);
+  } finally {
+    database.close();
+  }
 }
 
 export async function removeEncryptedDraft(
@@ -166,11 +186,14 @@ export async function clearEncryptedLocalData(
   accountId: string,
 ): Promise<void> {
   const database = await openDatabase();
-  await Promise.all([
-    deleteByAccount(database, DRAFT_STORE, accountId),
-    deleteByAccount(database, OUTBOX_STORE, accountId),
-  ]);
-  database.close();
+  try {
+    await Promise.all([
+      deleteByAccount(database, DRAFT_STORE, accountId),
+      deleteByAccount(database, OUTBOX_STORE, accountId),
+    ]);
+  } finally {
+    database.close();
+  }
 }
 
 function openDatabase(): Promise<IDBDatabase> {

@@ -43,4 +43,50 @@ describe("garden weather", () => {
     expect(weatherForEntry().label).toBe("Quiet air");
     expect(weatherForEntry(entry("language-neutral")).kind).toBe("still");
   });
+
+  it("lets heavy writing bring soft rain without scoring the writer", () => {
+    const heavy = {
+      ...entry("emotion"),
+      body: "I felt so sad and empty after the loss. I keep crying.",
+    };
+    const weather = weatherForEntry(heavy);
+    expect(weather.kind).toBe("rain");
+    expect(weather.label).toBe("Soft rain");
+    expect(weather.description.toLowerCase()).not.toMatch(/score|grade|sadness/);
+  });
+
+  it("keeps a mixed day in mist so the tree is not judged", () => {
+    const mixed = {
+      ...entry("meaning"),
+      body: "I felt sad and empty, and I am also grateful it happened.",
+    };
+    expect(weatherForEntry(mixed).kind).toBe("mist");
+    expect(weatherForEntry(mixed).label).toBe("Soft mist");
+  });
+
+  it("does not rain on a negated sadness, and anxious air stays restless", () => {
+    const negated = {
+      ...entry("emotion"),
+      body: "I am not sad about the weather.",
+    };
+    expect(weatherForEntry(negated).kind).not.toBe("rain");
+    const anxious = {
+      ...entry("context"),
+      body: "I feel anxious and worried.",
+    };
+    expect(weatherForEntry(anxious).kind).toBe("restless");
+    const numb = {
+      ...entry("emotion"),
+      body: "I feel numb and far away.",
+    };
+    expect(weatherForEntry(numb).kind).not.toBe("rain");
+  });
+
+  it("lets glad writing open more light", () => {
+    const glad = {
+      ...entry("context"),
+      body: "I am grateful and happy. Today felt warm and peaceful.",
+    };
+    expect(weatherForEntry(glad).kind).toBe("sunbreak");
+  });
 });

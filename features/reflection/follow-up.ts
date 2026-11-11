@@ -1,5 +1,4 @@
 import {
-  getFollowUpPrompts,
   getOpeningPrompts,
   PROMPT_LIBRARY_VERSION,
   type FollowUpPrompt,
@@ -9,62 +8,67 @@ import type {
   PromptCategory,
   ReflectionSnapshot,
 } from "@/lib/contracts";
-import { extractLongitudinalAnchor, extractSafeAnchor } from "./anchors";
-import { seededIndex, stableHash } from "./hash";
+import { composeGardenReply, type ComposedLine } from "./compose";
+import { seededIndex } from "./hash";
 
 export interface SelectedFollowUp {
   id: string;
   target: FollowUpPrompt["target"];
   renderedText: string;
   anchor?: string;
-}
-
-function orderPrompts(
-  prompts: readonly FollowUpPrompt[],
-  seed: string,
-): FollowUpPrompt[] {
-  return [...prompts].sort(
-    (left, right) =>
-      stableHash(`${seed}|${left.id}`) - stableHash(`${seed}|${right.id}`) ||
-      left.id.localeCompare(right.id),
-  );
+  /** True when the line asks a question drawn from the writer's words. */
+  fromScene?: boolean;
+  asks: boolean;
+  kind: ComposedLine["kind"];
+  span?: string;
 }
 
 export function selectFollowUp(options: {
   entryId: string;
   reflection: ReflectionSnapshot;
   body: string;
+  renderedPrompt?: string;
   previousBodies?: readonly string[];
   previousFollowUpIds?: readonly string[];
+  previousSpan?: string;
   differentQuestionOffset?: number;
+  turn?: 1 | 2 | 3;
+  heavy?: boolean;
 }): SelectedFollowUp {
   const {
     entryId,
     reflection,
     body,
+    renderedPrompt,
     previousBodies = [],
     previousFollowUpIds = [],
-    differentQuestionOffset = 0,
+    previousSpan,
+    turn = previousFollowUpIds.length > 0 ? 2 : 1,
+    heavy = false,
   } = options;
-  const target = reflection.selectedTarget;
-  const seed = `${entryId}|${reflection.engineVersion}|${target}|${PROMPT_LIBRARY_VERSION}`;
-  const ordered = orderPrompts(getFollowUpPrompts(target), seed);
-  const recent = new Set(previousFollowUpIds.slice(0, 7));
-  const fresh = ordered.filter((prompt) => !recent.has(prompt.id));
-  const pool = fresh.length > 0 ? fresh : ordered;
-  const prompt = pool[differentQuestionOffset % pool.length] ?? ordered[0];
-  const anchor =
-    extractSafeAnchor(body) ??
-    extractLongitudinalAnchor(body, previousBodies.slice(0, 10));
-
+  void entryId;
+  void previousBodies;
+  const composed = composeGardenReply({
+    text: body,
+    renderedPrompt,
+    previousSpan,
+    turn,
+    heavy,
+  });
+  const target =
+    reflection.selectedTarget === "language-neutral"
+      ? "language-neutral"
+      : composed.asks
+        ? "deepen"
+        : reflection.selectedTarget;
   return {
-    id: prompt.id,
+    id: composed.id,
     target,
-    renderedText:
-      anchor && prompt.anchoredText
-        ? prompt.anchoredText.replace("{anchor}", anchor)
-        : prompt.text,
-    ...(anchor && prompt.anchoredText ? { anchor } : {}),
+    renderedText: composed.renderedText,
+    fromScene: composed.asks,
+    asks: composed.asks,
+    kind: composed.kind,
+    span: composed.span,
   };
 }
 

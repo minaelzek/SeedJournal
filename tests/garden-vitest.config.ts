@@ -9,7 +9,9 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["tests/garden-*.test.ts"],
+    include: [
+      "tests/garden-*.test.ts",
+      "tests/living-sakura-*.test.ts",
+    ],
   },
 });
-

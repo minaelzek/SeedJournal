@@ -1,6 +1,6 @@
 export { EntryEditor } from "./EntryEditor";
 export type { EntryEditorHandle, EntryEditorProps } from "./EntryEditor";
-export { JournalRitual } from "./JournalRitual";
+export { CONVERSATION_OFFER_MS, JournalRitual } from "./JournalRitual";
 export type { JournalRitualProps } from "./JournalRitual";
 export {
   createRitualState,

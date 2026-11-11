@@ -9,8 +9,18 @@ describe("garden life state", () => {
     const sunbreak = gardenLifeForWeather("sunbreak");
 
     expect(breeze.windScale).toBeGreaterThan(still.windScale);
+    const restless = gardenLifeForWeather("restless");
+    expect(restless.windScale).toBeGreaterThan(still.windScale);
+    expect(restless.windScale).toBeLessThan(1.45);
     expect(breeze.petalCap).toBeGreaterThan(mist.petalCap);
     expect(mist.lightScale).toBeLessThan(still.lightScale);
+    expect(gardenLifeForWeather("rain").lightScale).toBeGreaterThan(0.85);
+    expect(gardenLifeForWeather("rain").lightScale).toBeLessThanOrEqual(still.lightScale);
     expect(sunbreak.lightScale).toBeGreaterThan(still.lightScale);
+    expect(gardenLifeForWeather("rain").wetness).toBeGreaterThan(0);
+    expect(gardenLifeForWeather("rain").wetness).toBeLessThan(0.5);
+    expect(sunbreak.glare).toBeGreaterThan(still.glare);
+    expect(gardenLifeForWeather("rain").petalCap).toBeGreaterThan(0);
+    expect(breeze.petalCap).toBeGreaterThan(still.petalCap);
   });
 });

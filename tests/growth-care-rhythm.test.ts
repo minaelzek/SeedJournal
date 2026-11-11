@@ -74,7 +74,7 @@ describe("calm care rhythm", () => {
 });
 
 describe("care invitation pull (Duolingo-style loop, calm copy)", () => {
-  it("offers a single primary path on an open day with living rhythm", () => {
+  it("offers a single primary path on an open day with attachment language", () => {
     const rhythm = createCareRhythm(
       ["2026-07-27", "2026-07-28", "2026-07-29"],
       "2026-07-30",
@@ -84,12 +84,16 @@ describe("care invitation pull (Duolingo-style loop, calm copy)", () => {
       hasBegun: true,
       reflectionCount: 4,
       rhythm,
+      nextChangeLabel: "A second shoot is gathering.",
     });
 
     expect(invitation.state).toBe("open");
     expect(invitation.ctaLabel).toBe("Care for the sakura");
-    expect(invitation.title).toBe("Keep the rhythm.");
-    expect(invitation.description).toMatch(/3 quiet days/);
+    expect(invitation.title).toBe("Your sakura slept.");
+    expect(invitation.description).toBe(
+      "It is still here. A second shoot is gathering.",
+    );
+    expect(invitation.footnote).not.toMatch(/\d|reflection/i);
     expect(`${invitation.eyebrow} ${invitation.title} ${invitation.ctaLabel}`).not.toMatch(
       /\b(xp|points?|score|streak freeze|leaderboard|gems?)\b/i,
     );
@@ -105,11 +109,18 @@ describe("care invitation pull (Duolingo-style loop, calm copy)", () => {
       hasBegun: true,
       reflectionCount: 3,
       rhythm,
+      nextChangeLabel: "A third shoot is gathering.",
     });
 
     expect(invitation.state).toBe("tended");
     expect(invitation.ctaLabel).toBe("Write another page");
-    expect(invitation.eyebrow).toBe("Today’s care is held");
+    expect(invitation.title).toBe("Let it settle.");
+    expect(invitation.eyebrow).toBe("");
+    expect(invitation.description).toBe("");
+    expect(invitation.footnote).toBe("");
+    expect(
+      `${invitation.eyebrow} ${invitation.title} ${invitation.description} ${invitation.footnote}`,
+    ).not.toMatch(/reflection|care complete|\d/i);
     expect(careRhythmDetail(rhythm)).toBe("3 quiet days together");
   });
 
@@ -134,10 +145,16 @@ describe("care invitation pull (Duolingo-style loop, calm copy)", () => {
 
     expect(invitation.state).toBe("first");
     expect(invitation.ctaLabel).toBe("Begin a reflection");
+    expect(invitation.title).toBe("A seed is waiting.");
+    expect(invitation.eyebrow).toBe("");
+    expect(invitation.description).toBe("");
+    expect(`${invitation.title} ${invitation.description}`).not.toMatch(
+      /how are you|deeper noticing/i,
+    );
     expect(invitation.footnote).toBe("Your sakura is waiting patiently.");
   });
 
-  it("surfaces yesterday-still-counts language on a one-day open rhythm", () => {
+  it("keeps an open day as sleep, even after a single quiet return", () => {
     const rhythm = createCareRhythm(["2026-07-29"], "2026-07-30", "en-CA");
     expect(careRhythmDetail(rhythm)).toBe("Yesterday’s care still counts");
     const invitation = careInvitation({
@@ -145,7 +162,8 @@ describe("care invitation pull (Duolingo-style loop, calm copy)", () => {
       reflectionCount: 1,
       rhythm,
     });
-    expect(invitation.description).toMatch(/Yesterday’s care still counts/i);
+    expect(invitation.title).toBe("Your sakura slept.");
+    expect(invitation.description).toBe("It is still here.");
   });
 });
 

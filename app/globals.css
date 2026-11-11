@@ -58,8 +58,14 @@
   --motion-press: 100ms;
   --motion-interface: 180ms;
   --motion-surface: 320ms;
+  --motion-garden: 420ms;
+  --motion-stage: 320ms;
   --ease-enter: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+  /* Apple-like press spring (ease-out with slight overshoot feel via multi-step CSS) */
+  --ease-press: cubic-bezier(0.2, 0.9, 0.3, 1);
+  --ease-spring: cubic-bezier(0.22, 1.2, 0.36, 1);
+  --press-scale: 0.97;
 
   /* Garden feature aliases */
   --sj-color-void: var(--primitive-void);
@@ -104,7 +110,13 @@
   --sj-space-4: var(--space-4);
   --sj-space-5: var(--space-5);
   --sj-space-6: var(--space-6);
+  --sj-space-7: 1.75rem;
   --sj-space-8: var(--space-8);
+  --sj-motion-garden: var(--motion-garden);
+  --sj-motion-stage: var(--motion-stage);
+  --sj-ease-press: var(--ease-press);
+  --sj-ease-spring: var(--ease-spring);
+  --sj-press-scale: var(--press-scale);
   --sj-radius-control: var(--radius-control);
   --sj-radius-surface: var(--radius-surface);
   --sj-motion-fast: var(--motion-interface);
@@ -156,9 +168,55 @@ a {
   -webkit-tap-highlight-color: transparent;
 }
 
+/**
+ * Shared 100k control craft — press / hover / focus physics for product CTAs.
+ * Feature sheets opt in via .sj-control or semantic button classes.
+ */
+.sj-control,
+.sj-journal-cta,
+.sj-ritual-button,
+.sj-welcome__cta,
+.sj-archive__new,
+.sj-header-icon-button {
+  transition:
+    transform var(--sj-motion-press, 100ms) var(--sj-ease-press, cubic-bezier(0.2, 0.9, 0.3, 1)),
+    box-shadow var(--sj-motion-hover, 160ms) var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)),
+    background-color var(--sj-motion-hover, 160ms) ease,
+    border-color var(--sj-motion-hover, 160ms) ease,
+    color var(--sj-motion-hover, 160ms) ease,
+    opacity var(--sj-motion-hover, 160ms) ease;
+}
+
+.sj-control:active:not(:disabled),
+.sj-journal-cta:active:not(:disabled),
+.sj-ritual-button:active:not(:disabled),
+.sj-welcome__cta:active,
+.sj-archive__new:active:not(:disabled),
+.sj-header-icon-button:active:not(:disabled) {
+  transform: scale(var(--sj-press-scale, 0.97));
+}
+
+.sj-control:focus-visible,
+.sj-journal-cta:focus-visible,
+.sj-ritual-button:focus-visible,
+.sj-welcome__cta:focus-visible,
+.sj-archive__new:focus-visible,
+.sj-header-icon-button:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sj-color-blossom-shadow, var(--color-focus)) 72%, transparent);
+  outline-offset: 3px;
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--sj-color-blossom, var(--color-blossom)) 22%, transparent);
+}
+
 ::selection {
-  color: var(--primitive-void);
-  background: var(--color-blossom-light);
+  color: #26332d;
+  background: #e8a4b4;
+}
+
+/* Light blossom tokens sit on paper sheets; pin ink so labels clear 4.5:1. */
+.sj-memory-preview .sj-memory-preview__form,
+.sj-growth-reveal .sj-growth-reveal__eyebrow {
+  color: #3d4a44;
 }
 
 :focus-visible {
@@ -167,12 +225,19 @@ a {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    scroll-behavior: auto !important;
-    animation-duration: 150ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 150ms !important;
+  html {
+    scroll-behavior: auto;
+  }
+
+  /* Stop decorative loops only. Sheet fades stay at their local 150ms opacity. */
+  .sj-app-frame__weather,
+  .sj-app-frame__weather::before,
+  .sj-app-frame__weather::after,
+  .sj-app-frame__weather span,
+  .sj-app-frame__garden,
+  .sj-seed-companion__halo,
+  .sj-seed-companion__body,
+  .sj-seed-companion__shadow {
+    animation: none;
   }
 }

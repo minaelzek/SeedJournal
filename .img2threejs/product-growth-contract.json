@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "target": "Seed Journal growth-constrained procedural sakura",
+  "confidenceGate": 0.9,
+  "structuralContract": {
+    "maximumGrowthUnits": 192,
+    "scoreUnits": [1, 2, 4, 6],
+    "milestones": [0, 1, 12, 48, 96, 192],
+    "hardCapCheckpoints": [384, 1000],
+    "parentFirst": true,
+    "maximumAttachmentGap": 0.001,
+    "maximumInteractiveMemories": 48,
+    "postMaturityBehavior": "The silhouette and organ-slot inventory remain fixed at 192 units. Up to 48 recent memories are rebound to existing deterministic organs; journal history remains available outside the tree."
+  },
+  "matureBlueprint": {
+    "branches": 202,
+    "roots": 6,
+    "scaffolds": 15,
+    "secondaries": 60,
+    "twigs": 120,
+    "blossomSlots": 678,
+    "leafSlots": 140,
+    "maximumWoodDrawCalls": 2
+  },
+  "visualGate": {
+    "minimumScore": 0.9,
+    "criticalFeatures": [
+      "broad asymmetric crown with readable negative spaces",
+      "continuous tapered trunk, scaffold, secondary, and twig hierarchy",
+      "visible root flare without radial spike silhouette",
+      "five-petal blossoms with varied scale, orientation, and pale-pink palette",
+      "sparse pointed copper-green leaves",
+      "distinct seed, sprout, sapling, young-tree, established, and mature silhouettes",
+      "non-degenerate front, side, long-axis, and thickness-axis views"
+    ]
+  },
+  "productGate": {
+    "required": [
+      "unit, attachment, hard-cap, memory-binding, and draw-call tests pass",
+      "desktop and narrow-mobile browser captures pass",
+      "keyboard and pointer memory selection pass",
+      "no critical or serious axe violations",
+      "reduced-motion mode uses demand rendering",
+      "full npm verify passes",
+      "default renderer is changed only after every gate above passes"
+    ]
+  },
+  "evidence": {
+    "factory": "features/garden/img2threejs/growthSakuraModel.ts",
+    "integration": "features/garden/img2threejs/Img2ThreeSakuraScene.tsx",
+    "unitTests": "tests/garden-growth-sakura-model.test.ts",
+    "browserTests": "tests/e2e/sakura-img2threejs.mjs",
+    "renders": ".img2threejs/renders/growth-*.png"
+  }
+}

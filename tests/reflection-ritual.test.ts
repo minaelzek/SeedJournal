@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  closeConversation,
   createRitualState,
   ritualReducer,
 } from "../features/journal/ritual-machine";
@@ -63,6 +64,87 @@ describe("journal ritual", () => {
     expect(state.stage).toBe("nurtured");
     expect(state.entry.followUp?.id).toBe(selectedId);
     expect(state.entry.growth?.completionId).toBe("completion-1");
+  });
+
+  it("asks about friends taking care of you after a concert night", () => {
+    let state = createRitualState({
+      entryId: "entry-concert",
+      localDay: "2026-08-14",
+      category: "open",
+    });
+    state = ritualReducer(state, { type: "begin-writing" });
+    state = ritualReducer(state, {
+      type: "set-body",
+      body: "I went out last night with my friends to a concert and I really enjoyed my time because my friends really took care of me.",
+    });
+    state = ritualReducer(state, { type: "offer-reflection" });
+    expect(state.entry.followUp?.id.startsWith("compose.")).toBe(true);
+    expect(state.entry.followUp?.renderedText).toMatch(/took care of you/i);
+    expect(state.entry.followUp?.renderedText).not.toMatch(/“friends”/u);
+
+    const firstId = state.entry.followUp?.id;
+    state = ritualReducer(state, {
+      type: "answer-follow-up",
+      response: "They noticed I was tired and stayed with me.",
+    });
+    state = ritualReducer(state, { type: "offer-second-reflection" });
+    expect(state.stage).toBe("second-reflection-offered");
+    expect(state.entry.secondFollowUp?.renderedText).toMatch(/stayed|tired/i);
+    expect(state.entry.secondFollowUp?.id.startsWith("compose.")).toBe(true);
+    expect(state.entry.secondFollowUp?.id).not.toBe(firstId);
+  });
+
+  it("lets a short emotional sentence enter reflection instead of locking it", () => {
+    let state = createRitualState({
+      entryId: "entry-great-day",
+      localDay: "2026-08-14",
+      category: "moment",
+    });
+    state = ritualReducer(state, { type: "begin-writing" });
+    state = ritualReducer(state, {
+      type: "set-body",
+      body: "Today was a great day.",
+    });
+    expect(measureReflectionEligibility(state.entry.body).eligible).toBe(false);
+    state = ritualReducer(state, { type: "offer-reflection" });
+    expect(state.stage).toBe("reflection-offered");
+    expect(state.entry.followUp?.renderedText).toBeTruthy();
+    expect(state.entry.reflection?.selectedTarget).toBe("emotion");
+  });
+
+  it("scores a deep page when you leave before a question is offered", () => {
+    const body =
+      "This morning I sat in the kitchen with my sister. I felt anxious and my chest was tight because her words mattered to me. Maybe I misunderstood part of what she meant, and I can be kind to myself while I ask. Tomorrow I will call her and listen before answering.";
+    let state = createRitualState({
+      entryId: "entry-leave-deep",
+      localDay: "2026-08-14",
+      category: "open",
+    });
+    state = ritualReducer(state, { type: "begin-writing" });
+    state = ritualReducer(state, { type: "set-body", body });
+    state = closeConversation(state);
+    state = ritualReducer(state, {
+      type: "nurture",
+      completionId: "completion-deep",
+    });
+    expect(state.entry.growth?.growthUnits).toBe(4);
+    expect(state.entry.growth?.growthUnits).toBeGreaterThan(0);
+  });
+
+  it("still nurtures a sad one-line page", () => {
+    let state = createRitualState({
+      entryId: "entry-sad",
+      localDay: "2026-08-14",
+    });
+    state = ritualReducer(state, { type: "begin-writing" });
+    state = ritualReducer(state, { type: "set-body", body: "I am sad." });
+    state = closeConversation(state);
+    state = ritualReducer(state, {
+      type: "nurture",
+      completionId: "completion-sad",
+    });
+    expect(state.entry.growth?.growthUnits).toBe(1);
+    expect(state.entry.growth?.memoryForm).toBe("leaf");
   });
 
   it("allows a deliberately concise reflection to continue as a small seed", () => {
@@ -143,6 +225,47 @@ describe("journal ritual", () => {
       scheduled: false,
     });
     expect(state.entry.returnBud).toBeUndefined();
+  });
+
+  it("closes a short conversation as a small seed without shrinking care", () => {
+    let state = createRitualState({
+      entryId: "entry-close",
+      localDay: "2026-07-29",
+    });
+    state = ritualReducer(state, { type: "begin-writing" });
+    state = ritualReducer(state, {
+      type: "set-body",
+      body: "A small true thing.",
+    });
+    const closed = closeConversation(state);
+    expect(closed.stage).toBe("seed-insight-skipped");
+    expect(closed.entry.ritual.conciseBodyOverride).toBe(true);
+    expect(closed.entry.growth).toBeUndefined();
+  });
+
+  it("keeps an answered follow-up when the conversation closes", () => {
+    let state = createRitualState({
+      entryId: "entry-close-deep",
+      localDay: "2026-07-29",
+      category: "feeling",
+    });
+    state = ritualReducer(state, { type: "begin-writing" });
+    state = ritualReducer(state, {
+      type: "set-body",
+      body: "I felt anxious before the meeting because I might freeze, and tomorrow I will speak anyway.",
+    });
+    state = ritualReducer(state, { type: "offer-reflection" });
+    state = ritualReducer(state, {
+      type: "answer-follow-up",
+      response: "The fear is that I will go blank.",
+    });
+    const closed = closeConversation(state);
+    expect(closed.stage).toBe("seed-insight-skipped");
+    expect(closed.entry.followUp?.response).toBe(
+      "The fear is that I will go blank.",
+    );
+    expect(closed.entry.followUp?.skipped).toBe(false);
+    expect(closed.entry.reflection).toBeDefined();
   });
 
   it("opens a revisit as a continuing conversation with the tree", () => {

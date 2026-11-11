@@ -14,9 +14,6 @@ const SIGNALS: readonly ReflectionSignal[] = [
   "integration",
 ];
 
-const ENGLISH_CLUES =
-  /\b(?:i|me|my|mine|myself|we|our|today|yesterday|tomorrow|feel|felt|because|when|what|this|that|the|and|but|was|were|am|is|are|have|had|want|need|will|would|could|should)\b/giu;
-
 const EMOTIONS = [
   "afraid",
   "angry",
@@ -30,16 +27,24 @@ const EMOTIONS = [
   "excited",
   "frustrated",
   "glad",
+  "good",
   "grateful",
+  "enjoyed",
+  "enjoy",
+  "great",
   "grief",
   "guilty",
   "happy",
+  "hate",
   "hopeful",
   "hurt",
   "jealous",
   "joy",
   "lonely",
+  "loved",
+  "miss",
   "nervous",
+  "okay",
   "overwhelmed",
   "peaceful",
   "proud",
@@ -48,17 +53,23 @@ const EMOTIONS = [
   "sad",
   "scared",
   "tender",
+  "terrible",
+  "tired",
   "uneasy",
+  "wonderful",
   "worried",
 ] as const;
+
+const EMOTION_WORDS = new Set<string>(EMOTIONS);
+const NEGATION_TOKENS = new Set(["not", "never", "no", "without"]);
 
 const BODY_SENSATIONS =
   /\b(?:ache|aching|breath|chest|heavy|lightness|numb|pulse|shaky|stomach|tense|tension|tight|tired|warm|weight)\b/giu;
 
 const CONTEXT_TIME =
-  /\b(?:today|tonight|yesterday|morning|afternoon|evening|week|month|year|earlier|later|before|after|during|while|when|at\s+\d{1,2}(?::\d{2})?)\b/giu;
+  /\b(?:today|tonight|yesterday|last\s+night|this\s+morning|morning|afternoon|evening|week|month|year|earlier|later|before|after|during|while|when|at\s+\d{1,2}(?::\d{2})?)\b/giu;
 const CONTEXT_PLACE =
-  /\b(?:at|in|inside|outside|near|beside|behind|across|home|office|work|school|room|kitchen|street|park|car|train|bus|store|table|door|window)\b/giu;
+  /\b(?:inside|outside|near|beside|behind|across|home|office|work|school|room|kitchen|hallway|bedroom|apartment|street|park|car|train|bus|store|door|window|concert|venue|party|garden)\b/giu;
 const CONTEXT_ACTION =
   /\b(?:asked|called|came|drove|heard|left|looked|met|noticed|opened|read|said|sat|saw|spoke|stood|talked|told|walked|watched|went|worked|wrote)\b/giu;
 const SENSORY =
@@ -76,6 +87,39 @@ const INTEGRATION =
 function countMatches(text: string, pattern: RegExp): number {
   pattern.lastIndex = 0;
   return Array.from(text.matchAll(pattern)).length;
+}
+
+function wordTokens(text: string): string[] {
+  return (
+    text
+      .toLowerCase()
+      .match(/[\p{L}\p{N}]+(?:['’][\p{L}\p{N}]+)*/gu)
+      ?.map((token) => token.replaceAll("’", "'")) ?? []
+  );
+}
+
+function isNegationToken(token: string): boolean {
+  return NEGATION_TOKENS.has(token) || token.endsWith("n't");
+}
+
+// A feeling word is dropped when not / never / no / without / n't
+// sits earlier in the same clause. Perspective phrases stay on the raw body.
+function countDistinctEmotionHits(text: string): number {
+  const clauses = text.split(/[,;:.!?]|[\u2014\u2013]|\b(?:and|but)\b/iu);
+  const hits = new Set<string>();
+  for (const clause of clauses) {
+    const tokens = wordTokens(clause);
+    let negated = false;
+    for (const token of tokens) {
+      if (isNegationToken(token)) {
+        negated = true;
+        continue;
+      }
+      if (!token || !EMOTION_WORDS.has(token) || negated) continue;
+      hits.add(token);
+    }
+  }
+  return hits.size;
 }
 
 function strengthFromEvidence(
@@ -108,9 +152,6 @@ export function getReflectionMode(
 
   const nonLatin = letters.filter((letter) => !/\p{Script=Latin}/u.test(letter));
   if (nonLatin.length / letters.length >= 0.2) return "language-neutral";
-
-  const clues = body.match(ENGLISH_CLUES) ?? [];
-  if (letters.length >= 60 && clues.length === 0) return "language-neutral";
   return "english-rules";
 }
 
@@ -141,7 +182,6 @@ export function evaluateReflection(
   }
 
   const firstPerson = /\b(?:i|me|my|mine|myself)\b/iu.test(body);
-  const emotionWords = new RegExp(`\\b(?:${EMOTIONS.join("|")})\\b`, "giu");
   const contextEvidence = [
     countMatches(body, CONTEXT_TIME) > 0,
     countMatches(body, CONTEXT_PLACE) > 0,
@@ -149,10 +189,11 @@ export function evaluateReflection(
     countMatches(body, SENSORY) > 0,
     countMatches(body, RELATIONSHIP) > 0,
   ].filter(Boolean).length;
+  const emotionHits = countDistinctEmotionHits(body);
   const emotionEvidence =
-    (firstPerson && countMatches(body, emotionWords) > 0 ? 1 : 0) +
+    (emotionHits > 0 ? 1 : 0) +
     (firstPerson && countMatches(body, BODY_SENSATIONS) > 0 ? 1 : 0) +
-    (countMatches(body, emotionWords) >= 2 ? 1 : 0);
+    (emotionHits >= 2 || (firstPerson && emotionHits > 0) ? 1 : 0);
   const meaningEvidence = countMatches(body, MEANING);
   const perspectiveEvidence = countMatches(body, PERSPECTIVE);
   const integrationEvidence = countMatches(body, INTEGRATION);
@@ -165,11 +206,17 @@ export function evaluateReflection(
     integration: strengthFromEvidence(integrationEvidence, 2),
   };
 
+  const shortSeed = body.trim().split(/\s+/u).filter(Boolean).length < 12;
+  const selectedTarget =
+    shortSeed && strengths.emotion > 0 && strengths.meaning === 0
+      ? "emotion"
+      : selectReflectionTarget(strengths, options.category ?? "open");
+
   return {
     engineVersion: REFLECTION_ENGINE_VERSION,
     mode,
     strengths,
-    selectedTarget: selectReflectionTarget(strengths, options.category ?? "open"),
+    selectedTarget,
   };
 }
 

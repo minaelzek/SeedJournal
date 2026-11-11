@@ -18,6 +18,33 @@
   overflow: hidden;
 }
 
+/* Host garden: AppFrame owns the 3D body — overlay is copy + glow only. */
+.sj-growth-reveal[data-host-garden] {
+  justify-content: flex-end;
+  padding-bottom: max(4.5rem, env(safe-area-inset-bottom));
+}
+
+.sj-growth-reveal[data-host-garden] .sj-growth-reveal__tree {
+  min-height: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sj-growth-reveal[data-host-garden] .sj-growth-reveal__sky {
+  background: transparent;
+}
+
+.sj-growth-reveal[data-host-garden] .sj-growth-reveal__copy {
+  width: min(100%, 28rem);
+  padding: 1.25rem 1.35rem 1.4rem;
+  border-radius: 1.35rem;
+  background: color-mix(in srgb, var(--sj-color-surface, #fffdf9) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--sj-color-border, rgb(38 51 45 / 14%)) 80%, transparent);
+  box-shadow: 0 1.25rem 3rem rgb(38 51 45 / 10%);
+  backdrop-filter: blur(1rem) saturate(0.92);
+}
+
 .sj-growth-reveal__sky {
   position: absolute;
   inset: 0;
@@ -70,12 +97,32 @@
 
 .sj-growth-reveal__stage {
   position: relative;
-  width: min(100%, 24rem);
-  margin-bottom: 0.25rem;
+  width: min(100%, 32rem);
+  height: min(48vh, 26rem);
+  margin-bottom: 0.35rem;
 }
 
 .sj-growth-reveal__tree {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   margin-bottom: 0;
+  border-radius: 1.5rem;
+  overflow: hidden;
+}
+
+.sj-growth-reveal__tree-fallback {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(
+      ellipse 70% 55% at 50% 42%,
+      color-mix(in srgb, var(--sj-color-blossom-light) 22%, transparent),
+      transparent 70%
+    ),
+    linear-gradient(165deg, #f4ebe1 0%, #eadfd4 100%);
 }
 
 .sj-growth-reveal__petals {
@@ -219,7 +266,7 @@
     transform: translate(-50%, -50%) scale(0.85);
   }
   to {
-    opacity: 1;
+    opacity: 0.08;
     transform: translate(-50%, -50%) scale(1);
   }
 }

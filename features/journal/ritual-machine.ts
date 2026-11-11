@@ -2,6 +2,8 @@ import { PROMPT_LIBRARY_VERSION } from "@/data/prompts";
 import {
   evaluateReflection,
   growthForEntry,
+  pageIsHeavy,
+  quotedSpan,
   selectDailyOpeningPrompt,
   selectFollowUp,
 } from "@/features/reflection";
@@ -114,7 +116,7 @@ export function createRitualState(
   const category =
     restored?.entry.prompt.category ??
     options.category ??
-    (options.kind === "revisit" ? "change" : "moment");
+    (options.kind === "revisit" ? "change" : "open");
   return {
     entryId: options.entryId,
     localDay: options.localDay,
@@ -170,10 +172,13 @@ function withFollowUp(
     entryId: state.entryId,
     reflection,
     body: state.entry.body,
+    renderedPrompt: state.entry.prompt.renderedText,
     previousBodies: options.previousBodies,
     previousFollowUpIds: options.previousFollowUpIds,
     differentQuestionOffset: options.offset,
+    turn: 1,
   });
+  if (followUp.kind === "silent") return state;
 
   return {
     ...state,
@@ -201,28 +206,27 @@ function withSecondFollowUp(
     previousFollowUpIds?: readonly string[];
   },
 ): RitualState {
-  const combinedReflection = [
-    state.entry.body,
-    state.entry.followUp?.response,
-  ]
-    .filter(Boolean)
-    .join("\n\n");
-  const reflection = evaluateReflection(combinedReflection, {
-    category: state.category,
-    renderedPrompt: state.entry.prompt.renderedText,
-  });
-  const previousFollowUpIds = [
-    ...(state.entry.followUp?.id ? [state.entry.followUp.id] : []),
-    ...(options.previousFollowUpIds ?? []),
-  ];
+  const answer = state.entry.followUp?.response ?? "";
+  const reflection = evaluateReflection(
+    [state.entry.body, answer].filter(Boolean).join("\n\n"),
+    {
+      category: state.category,
+      renderedPrompt: state.entry.prompt.renderedText,
+    },
+  );
   const followUp = selectFollowUp({
     entryId: `${state.entryId}|second`,
     reflection,
-    body: combinedReflection,
+    body: answer,
+    renderedPrompt: state.entry.prompt.renderedText,
     previousBodies: options.previousBodies,
-    previousFollowUpIds,
+    previousFollowUpIds: options.previousFollowUpIds,
+    previousSpan: quotedSpan(state.entry.followUp?.renderedText),
     differentQuestionOffset: options.offset,
+    turn: 2,
+    heavy: pageIsHeavy(state.entry.body),
   });
+  if (!followUp.asks) return state;
 
   return {
     ...state,
@@ -440,22 +444,23 @@ export function ritualReducer(
     case "return-to-writing":
       return { ...state, stage: "writing" };
     case "nurture": {
+      const reflection = reflectionAcrossConversation(state);
+      const entry = { ...state.entry, reflection };
+      const secondAnswered = Boolean(
+        entry.secondFollowUp &&
+          !entry.secondFollowUp.skipped &&
+          entry.secondFollowUp.response.trim(),
+      );
       const growth = growthForEntry(
         state.entryId,
-        state.entry,
-        state.entry.reflection?.mode === "language-neutral" &&
-          Boolean(state.entry.seedInsight.trim()) &&
-          Boolean(
-            state.entry.followUp &&
-              !state.entry.followUp.skipped &&
-              state.entry.followUp.response.trim(),
-          ),
+        entry,
+        entry.reflection?.mode === "language-neutral" && secondAnswered,
       );
       return {
         ...state,
         stage: "nurtured",
         entry: {
-          ...state.entry,
+          ...entry,
           growth: {
             completionId: action.completionId,
             memoryForm: growth.memoryForm,
@@ -479,6 +484,47 @@ function nextLocalDay(localDay: string): string {
   const date = new Date(year, month - 1, day, 12);
   date.setDate(date.getDate() + 1);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * Closes the one-page conversation without a seed-insight screen.
+ * A thin entry, a skipped question, and a heavy entry all still reach nurture.
+ * Growth units are applied later and are never negative.
+ */
+export function closeConversation(state: RitualState): RitualState {
+  if (
+    state.stage === "nurtured" ||
+    state.stage === "seed-insight-added" ||
+    state.stage === "seed-insight-skipped"
+  ) {
+    return state;
+  }
+
+  let next = state;
+  if (next.stage === "new" || next.stage === "writing") {
+    next = ritualReducer(next, { type: "keep-small-seed" });
+  } else if (next.stage === "reflection-offered") {
+    next = next.entry.followUp?.response.trim()
+      ? ritualReducer(next, { type: "continue-from-follow-up" })
+      : ritualReducer(next, { type: "skip-follow-up" });
+  } else if (next.stage === "second-reflection-offered") {
+    next = next.entry.secondFollowUp?.response.trim()
+      ? ritualReducer(next, { type: "continue-from-second-follow-up" })
+      : ritualReducer(next, { type: "skip-second-follow-up" });
+  }
+
+  if (
+    next.stage === "follow-up-answered" ||
+    next.stage === "follow-up-skipped" ||
+    next.stage === "second-reflection-answered" ||
+    next.stage === "second-reflection-skipped"
+  ) {
+    next = next.entry.seedInsight.trim()
+      ? ritualReducer(next, { type: "continue-with-seed-insight" })
+      : ritualReducer(next, { type: "skip-seed-insight" });
+  }
+
+  return next;
 }
 
 export function nextSeedStage(stage: RitualStage): RitualStage {

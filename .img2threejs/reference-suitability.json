@@ -1,0 +1,6 @@
+{
+  "verdict": "conditional",
+  "reason": "The reference has one clear full-tree silhouette, visible bark/flower/leaf materials, and enough macro structure for a procedural approximation. It is a single view of an organic subject, so rear branch depth and hidden roots are inferred.",
+  "acceptedStylization": "flat-shaded low-poly real-time browser prop",
+  "requiredCaveat": "Do not claim exact botanical or hidden-side geometry; preserve the observed branching hierarchy and blossom distribution as the fidelity target."
+}

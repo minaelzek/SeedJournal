@@ -1,7 +1,13 @@
 "use client";
 
-import { ArrowRight, Sparkle } from "@phosphor-icons/react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight } from "@phosphor-icons/react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ComponentType,
+} from "react";
 import type {
   GrowthKind,
   TreeGrowthDelta,
@@ -9,7 +15,15 @@ import type {
   TreeSnapshot,
   TreeStage,
 } from "@/lib/contracts";
-import { IllustratedSakura } from "@/features/garden/illustration";
+import {
+  GROWTH_CEREMONY_DURATION_SECONDS,
+  GROWTH_REVEAL_REDUCED_MOTION_SECONDS,
+} from "@/features/garden/living-sakura/growthCeremony";
+import type {
+  LivingMemoryInput,
+  PrivateGrowthUnits,
+} from "@/features/growth/livingDevelopment";
+import type { LivingSakuraGardenProps } from "@/features/garden/living-sakura/LivingSakuraGarden";
 import {
   morphIntentForReveal,
   presentSakura,
@@ -19,6 +33,62 @@ import {
 import { stageGrowthMessage } from "./stages";
 import "./growth.css";
 
+/**
+ * Client-only living garden loader — keeps WebGL out of SSR/static markup
+ * while still mounting the same Living Sakura body as home.
+ */
+function LivingRevealTree(props: LivingSakuraGardenProps) {
+  const [Garden, setGarden] = useState<ComponentType<
+    LivingSakuraGardenProps
+  > | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void import("@/features/garden/living-sakura/LivingSakuraGarden").then(
+      (module) => {
+        if (!cancelled) setGarden(() => module.LivingSakuraGarden);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (!Garden) {
+    return (
+      <div className="sj-growth-reveal__tree-fallback" aria-hidden="true" />
+    );
+  }
+  return <Garden {...props} />;
+}
+
+/** Same private-units mapping as LivingSakuraGarden (kept local to avoid canvas import). */
+function asPrivateGrowthUnits(value: number): PrivateGrowthUnits {
+  if (value >= 6) return 6;
+  if (value >= 4) return 4;
+  if (value >= 2) return 2;
+  return 1;
+}
+
+/** Same snapshot→memory mapping as LivingSakuraGarden.memoriesFromSnapshot. */
+function livingMemoriesFromSnapshot(
+  snapshot: TreeSnapshot,
+): LivingMemoryInput[] {
+  const memoryEvents = snapshot.events
+    .filter(
+      (event) =>
+        Boolean(event.entryId) && event.kind.startsWith("memory_"),
+    )
+    .sort((left, right) => left.occurredAt - right.occurredAt);
+
+  return memoryEvents.map((event, index) => ({
+    entryId: event.entryId as string,
+    ordinal: index + 1,
+    privateGrowthUnits: asPrivateGrowthUnits(event.growthUnits || 1),
+    seed: event.seed,
+  }));
+}
+
 export interface GrowthRevealProps {
   delta: TreeGrowthDelta;
   seedInsight?: string;
@@ -26,8 +96,15 @@ export interface GrowthRevealProps {
   reducedMotion: boolean;
   treeId: string;
   onReturn: () => void;
-  /** Full snapshot enables on-tree sakura morph theater. */
+  /** Full snapshot enables the living-sakura ceremony on the same body as home. */
   snapshot?: TreeSnapshot;
+  /**
+   * When true, copy overlay only — the home AppFrame garden already runs
+   * revealMode on a single Canvas (no second WebGL tree).
+   */
+  hostGarden?: boolean;
+  /** True once the living tree ceremony has settled. */
+  ceremonyComplete?: boolean;
 }
 
 export interface GrowthRevealStorage {
@@ -50,6 +127,9 @@ export interface GrowthCelebration {
 const STORAGE_PREFIX = "seed-journal:growth-reveal:";
 const shownThisSession = new Set<string>();
 
+/** Copy appears as organs settle — same clock for every private tier. */
+const COPY_AT_SECONDS = 2.8;
+/** Legacy morph timings retained for any timing-aware consumers. */
 const MORPH_MS: Record<MorphIntent, number> = {
   micro: 900,
   hanami: 1700,
@@ -121,22 +201,28 @@ export function growthFormFromKind(kind: GrowthKind | string): GrowthFormKind {
   return "leaf";
 }
 
+/**
+ * Surrounding botanical flourish only — never a public grade of the memory itself.
+ * Every completed journal still opens one equal memory petal.
+ */
+/**
+ * Surrounding life language — variety, never a public grade ladder.
+ * Avoid ranked words (leaf/bud/blossom as scores; no "luminous" rank).
+ */
 export function growthFormLabel(form: GrowthFormKind): string {
   switch (form) {
     case "luminous":
-      return "A radiant sakura blossom opened";
     case "blossom":
-      return "A sakura blossom opened";
     case "bud":
-      return "A new sakura bud formed";
     case "leaf":
-      return "Fresh leaves unfurled on your sakura";
+      // One sentence for every tier. Depth still changes the tree in private.
+      return "Nearby, quiet life gathered beside the memory";
   }
 }
 
 /**
- * Celebration copy — Duolingo joy, Apple restraint, sakura identity.
- * No XP / scores / evaluation language.
+ * Celebration copy — equal memory petal first; surrounding growth is flourish only.
+ * No XP / scores / evaluation language. No structural grade claims.
  */
 export function growthCelebration(
   delta: TreeGrowthDelta,
@@ -147,39 +233,33 @@ export function growthCelebration(
   const form = growthFormFromKind(earned?.kind ?? "leaf");
   const formLabel = growthFormLabel(form);
   const stageCopy = stageGrowthMessage(stage);
-  const structural = delta.events.filter(
-    (event) => event.kind === "twig" || event.kind === "branch",
-  );
   const memoryEvents = delta.events.filter((event) =>
     event.kind.startsWith("memory_"),
   );
+  const hasMemory = memoryEvents.length > 0;
 
-  let title = stageCopy.title;
-  let detail = stageCopy.detail;
+  // Equal beauty: every completion is a permanent memory petal.
+  const petalLead = hasMemory
+    ? "A bud opened on your sakura."
+    : "Your sakura received quiet care.";
+
+  let title = petalLead;
+  let detail = `${formLabel}. ${stageCopy.detail}`;
   let kicker = "Your sakura grew";
 
   if (morphIntent === "hanami") {
-    kicker = form === "luminous" ? "Deep noticing" : "Spring answered";
-    title =
-      form === "luminous"
-        ? "Your sakura opened in light."
-        : "Your sakura has blossomed.";
+    kicker = "Spring answered";
+    title = petalLead;
     detail = `${formLabel}. The canopy holds what you were willing to see.`;
   } else if (morphIntent === "stage-cross") {
-    kicker = "A new form";
+    kicker = "A fuller life";
     title = stageCopy.title;
-    detail = `${formLabel}. The cherry stepped into a fuller life. ${stageCopy.detail}`;
-  } else if (structural.length > 0 && memoryEvents.length > 0) {
-    kicker = "Quiet growth";
-    const branchLike = structural.some((event) => event.kind === "branch");
-    detail = branchLike
-      ? `${formLabel.replace(/\.$/, "")}, and a new branch reached outward. ${stageCopy.detail}`
-      : `${formLabel.replace(/\.$/, "")}, and a new twig found light. ${stageCopy.detail}`;
+    detail = `${petalLead} ${formLabel}. ${stageCopy.detail}`;
   } else if (memoryEvents.length > 1) {
     kicker = "More than one gift";
-    detail = `Several quiet forms took place in the sakura. ${stageCopy.detail}`;
+    detail = `Several memory petals found places on the tree. ${stageCopy.detail}`;
   } else {
-    kicker = form === "leaf" ? "Tender care" : "A small opening";
+    kicker = "With the tree";
     detail = `${formLabel}. ${stageCopy.detail}`;
   }
 
@@ -215,7 +295,7 @@ function revealSnapshot(
     algorithmVersion: 2,
     totalEntries: delta.events.filter((event) => event.entryId).length,
     distinctJournalDays: 1,
-    events: delta.events,
+    events: [...delta.events],
   };
 }
 
@@ -227,12 +307,18 @@ export function GrowthReveal({
   treeId,
   onReturn,
   snapshot,
+  hostGarden = false,
+  ceremonyComplete = false,
 }: GrowthRevealProps) {
   const exact = useMemo(() => isExactGrowthDelta(delta), [delta]);
+  const hasEvents = delta.events.length > 0;
   const storage = sessionStorageIfAvailable();
+  // Never silent-skip: present full ceremony when exact; otherwise calm fallback.
   const [shouldPresent] = useState(
-    () => exact && !hasPresentedGrowthReveal(treeId, delta, storage),
+    () =>
+      hasEvents && !hasPresentedGrowthReveal(treeId, delta, storage),
   );
+  const isFallback = shouldPresent && !exact;
   const returned = useRef(false);
   const treeSnapshot = useMemo(
     () => revealSnapshot(treeId, delta, snapshot),
@@ -255,16 +341,33 @@ export function GrowthReveal({
     [delta.previousSequence, treeSnapshot],
   );
 
-  const [revealPhase, setRevealPhase] = useState<"before" | "after">(
-    reducedMotion ? "after" : "before",
+  // Living body inputs — same mapping as the home garden.
+  const livingMemories = useMemo(
+    () => livingMemoriesFromSnapshot(treeSnapshot),
+    [treeSnapshot],
   );
-  const [copyReady, setCopyReady] = useState(reducedMotion);
+  const earnedEvent = useMemo(
+    () => selectEarnedGrowthEvent(delta),
+    [delta],
+  );
+  const newestEntryId =
+    earnedEvent?.entryId ?? livingMemories.at(-1)?.entryId ?? null;
+  const newestGrowthUnits = asPrivateGrowthUnits(
+    earnedEvent?.growthUnits ??
+      livingMemories.at(-1)?.privateGrowthUnits ??
+      1,
+  );
+
+  const [copyReady, setCopyReady] = useState(false);
+  const displayedCopyReady =
+    reducedMotion || isFallback || copyReady || ceremonyComplete;
 
   useEffect(() => {
     if (shouldPresent) {
       markGrowthRevealPresented(treeId, delta, storage);
       return;
     }
+    // Already presented this session — return home without a blank beat.
     if (!returned.current) {
       returned.current = true;
       onReturn();
@@ -273,59 +376,73 @@ export function GrowthReveal({
 
   useEffect(() => {
     if (!shouldPresent) return;
-    if (reducedMotion) {
-      setRevealPhase("after");
-      setCopyReady(true);
-      return;
-    }
-    // Hold "before" one frame, then morph — Apple-calm choreography
-    let copyTimer = 0;
-    const morphTimer = window.setTimeout(() => {
-      setRevealPhase("after");
-      copyTimer = window.setTimeout(() => setCopyReady(true), 280);
-    }, 420);
+    // Equal ceremony duration across tiers; reduced-motion / fallback short dissolve.
+    const copyAtMs =
+      reducedMotion || isFallback
+        ? GROWTH_REVEAL_REDUCED_MOTION_SECONDS * 1000
+        : COPY_AT_SECONDS * 1000;
+    const copyTimer = window.setTimeout(() => setCopyReady(true), copyAtMs);
     return () => {
-      window.clearTimeout(morphTimer);
       window.clearTimeout(copyTimer);
     };
-  }, [reducedMotion, shouldPresent]);
+  }, [isFallback, reducedMotion, shouldPresent]);
 
   if (!shouldPresent) return null;
 
   const isLeap =
-    celebration.morphIntent === "hanami" ||
-    celebration.morphIntent === "stage-cross";
+    !isFallback &&
+    (celebration.morphIntent === "hanami" ||
+      celebration.morphIntent === "stage-cross");
 
   return (
     <section
       aria-labelledby="growth-reveal-title"
       aria-describedby="growth-reveal-detail"
-      aria-live="polite"
+      aria-busy={!displayedCopyReady}
       className="sj-growth-reveal"
       data-reduced-motion={reducedMotion || undefined}
       data-growth-form={
         celebration.form === "luminous" ? "blossom" : celebration.form
       }
       data-morph-intent={celebration.morphIntent}
-      data-copy-ready={copyReady || undefined}
+      data-copy-ready={displayedCopyReady || undefined}
       data-leap={isLeap || undefined}
+      data-living-reveal
+      data-host-garden={hostGarden || undefined}
+      data-fallback={isFallback || undefined}
+      data-ceremony-seconds={String(GROWTH_CEREMONY_DURATION_SECONDS)}
     >
+      <p className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+        {displayedCopyReady
+          ? `${celebration.title} ${celebration.detail}`
+          : "Your sakura is growing."}
+      </p>
       <div className="sj-growth-reveal__sky" aria-hidden="true" />
       <div className="sj-growth-reveal__glow" aria-hidden="true" />
 
       <div className="sj-growth-reveal__stage">
-        <IllustratedSakura
-          snapshot={treeSnapshot}
-          growthDelta={delta}
-          revealPhase={revealPhase}
-          morphIntent={celebration.morphIntent}
-          reducedMotion={reducedMotion}
-          size="reveal"
+        <div
           className="sj-growth-reveal__tree"
-        />
-        {isLeap && revealPhase === "after" && !reducedMotion ? (
+          data-living-sakura-reveal
+          data-journal-count={livingMemories.length}
+          data-newest-growth-units={newestGrowthUnits}
+          data-host-garden={hostGarden || undefined}
+        >
+          {/* Product path: AppFrame hosts the single living Canvas in revealMode. */}
+          {hostGarden ? null : (
+            <LivingRevealTree
+              snapshot={treeSnapshot}
+              selectedEntryId={newestEntryId}
+              interactive={false}
+              revealMode
+              reducedMotion={reducedMotion || isFallback}
+              newestGrowthUnits={newestGrowthUnits}
+            />
+          )}
+        </div>
+        {isLeap && displayedCopyReady && !reducedMotion ? (
           <div className="sj-growth-reveal__petals" aria-hidden="true">
-            {Array.from({ length: 12 }).map((_, index) => (
+            {Array.from({ length: 8 }).map((_, index) => (
               <span
                 key={index}
                 className="sj-growth-reveal__petal"
@@ -341,12 +458,9 @@ export function GrowthReveal({
 
       <div
         className="sj-growth-reveal__copy"
-        data-ready={copyReady || undefined}
+        data-ready={displayedCopyReady || undefined}
       >
-        <p className="sj-growth-reveal__eyebrow">
-          <Sparkle aria-hidden size={14} weight="fill" />
-          {celebration.kicker}
-        </p>
+        <p className="sj-growth-reveal__eyebrow">{celebration.kicker}</p>
         <h1 id="growth-reveal-title">{celebration.title}</h1>
         <p id="growth-reveal-detail">{celebration.detail}</p>
         {seedInsight ? (
@@ -373,3 +487,4 @@ export function GrowthReveal({
 
 // re-export for timing-aware tests if needed
 export const growthRevealMorphMs = MORPH_MS;
+export const growthRevealCeremonySeconds = GROWTH_CEREMONY_DURATION_SECONDS;

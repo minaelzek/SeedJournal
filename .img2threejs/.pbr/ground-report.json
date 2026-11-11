@@ -1,0 +1,85 @@
+{
+  "ok": true,
+  "verdict": "pass",
+  "confidence": 0.86,
+  "estimatedFidelity": 0.86,
+  "targetThreshold": 0.7,
+  "materialId": "ground",
+  "sourceImage": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs\\detail-crops\\zone-r2c0.png",
+  "outDir": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs\\pbr\\ground",
+  "palette": [
+    "#DABEB3",
+    "#CEAB9F",
+    "#E9DACF",
+    "#86664E",
+    "#B69078"
+  ],
+  "maps": {
+    "albedo": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs\\pbr\\ground\\ground_albedo.png",
+      "url": "ground_albedo.png",
+      "channel": "albedo",
+      "source": "reference-pixel-extraction"
+    },
+    "roughness": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs\\pbr\\ground\\ground_roughness.png",
+      "url": "ground_roughness.png",
+      "channel": "roughness",
+      "source": "reference-pixel-extraction"
+    },
+    "height": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs\\pbr\\ground\\ground_height.png",
+      "url": "ground_height.png",
+      "channel": "height",
+      "source": "reference-pixel-extraction"
+    },
+    "normal": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs\\pbr\\ground\\ground_normal.png",
+      "url": "ground_normal.png",
+      "channel": "normal",
+      "source": "reference-pixel-extraction"
+    },
+    "ao": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs\\pbr\\ground\\ground_ao.png",
+      "url": "ground_ao.png",
+      "channel": "ao",
+      "source": "reference-pixel-extraction"
+    }
+  },
+  "diagnostics": {
+    "sourceWidth": 418,
+    "sourceHeight": 418,
+    "mapSize": 1024,
+    "cropBBoxPixels": {
+      "x": 16,
+      "y": 0,
+      "width": 402,
+      "height": 371
+    },
+    "mask": {
+      "backgroundColor": "#F8F0E5",
+      "backgroundNoise": 3.0,
+      "transparentPixelFraction": 0.0,
+      "foregroundCoverage": 0.1106
+    },
+    "mapStats": {
+      "valueRange": 0.4528,
+      "heightP90Gradient": 0.02839,
+      "roughnessBase": 0.68,
+      "roughnessVariation": 0.05,
+      "normalStrength": 0.19,
+      "blurRadius": 21
+    },
+    "palette": [
+      "#DABEB3",
+      "#CEAB9F",
+      "#E9DACF",
+      "#86664E",
+      "#B69078"
+    ]
+  },
+  "warnings": [
+    "single-image inverse rendering cannot prove true physical PBR; confidence is capped"
+  ],
+  "limitation": "single-image PBR extraction is an estimate; 70%+ extraction confidence still needs render screenshot review"
+}

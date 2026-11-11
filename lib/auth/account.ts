@@ -1,50 +1,221 @@
 import "server-only";
 
-import { eq } from "drizzle-orm";
-import { getChatGPTUser } from "@/app/chatgpt-auth";
+import { and, eq } from "drizzle-orm";
 import { getDb } from "@/db";
-import { accounts, type Account } from "@/db/schema";
+import {
+  accounts,
+  socialAccounts,
+  type Account,
+} from "@/db/schema";
 import { AuthenticationRequiredError } from "./errors";
+import { getRequestPrincipal } from "./principal";
+import { resolveSessionAccountId } from "./session";
+import {
+  socialSubjectId,
+  type SocialProvider,
+  type VerifiedSocialIdentity,
+} from "./social-identity";
 
-export function normalizeAuthEmail(email: string): string {
+function normalizeProfileEmail(email: string): string {
   return email.trim().normalize("NFC").toLocaleLowerCase("en-US");
 }
 
-export async function resolveApiAccount(): Promise<Account> {
-  const user = await getChatGPTUser();
-  if (!user) throw new AuthenticationRequiredError();
+function normalizeProfileDisplayName(displayName: string): string {
+  return displayName.trim().normalize("NFC");
+}
 
-  const authEmail = normalizeAuthEmail(user.email);
-  if (!authEmail || authEmail.length > 320) {
+export async function resolveApiAccount(): Promise<Account> {
+  const principal = await getRequestPrincipal();
+  if (!principal) throw new AuthenticationRequiredError();
+
+  if (principal.kind === "session") {
+    const accountId = await resolveSessionAccountId(principal.sessionToken);
+    if (!accountId) throw new AuthenticationRequiredError();
+    const db = getDb();
+    const account = await db.query.accounts.findFirst({
+      where: eq(accounts.id, accountId),
+    });
+    if (!account) throw new AuthenticationRequiredError();
+    return account;
+  }
+
+  return upsertAccountBySubject({
+    authSubjectId: principal.subjectId,
+    email: principal.email,
+    displayName: principal.displayName,
+  });
+}
+
+export async function upsertAccountBySubject(input: {
+  authSubjectId: string;
+  email?: string;
+  displayName?: string;
+}): Promise<Account> {
+  const authSubjectId = input.authSubjectId.trim();
+  if (!authSubjectId || authSubjectId.length > 256) {
+    throw new AuthenticationRequiredError();
+  }
+
+  const email =
+    input.email === undefined ? undefined : normalizeProfileEmail(input.email);
+  const displayName =
+    input.displayName === undefined
+      ? undefined
+      : normalizeProfileDisplayName(input.displayName);
+  if (email !== undefined && email.length > 320) {
+    throw new AuthenticationRequiredError();
+  }
+  if (displayName !== undefined && displayName.length > 256) {
     throw new AuthenticationRequiredError();
   }
 
   const db = getDb();
   const existing = await db.query.accounts.findFirst({
-    where: eq(accounts.authEmail, authEmail),
+    where: eq(accounts.authSubjectId, authSubjectId),
   });
-  if (existing) return existing;
+  if (existing) {
+    const profileUpdate: {
+      email?: string | null;
+      displayName?: string | null;
+      updatedAt?: number;
+    } = {};
+    if (email !== undefined && email !== existing.email) {
+      profileUpdate.email = email || null;
+    }
+    if (displayName !== undefined && displayName !== existing.displayName) {
+      profileUpdate.displayName = displayName || null;
+    }
+
+    if (Object.keys(profileUpdate).length > 0) {
+      const updatedAt = Date.now();
+      await db
+        .update(accounts)
+        .set({ ...profileUpdate, updatedAt })
+        .where(eq(accounts.id, existing.id));
+      return { ...existing, ...profileUpdate, updatedAt };
+    }
+    return existing;
+  }
 
   const now = Date.now();
   await db
     .insert(accounts)
     .values({
       id: crypto.randomUUID(),
-      authEmail,
+      authSubjectId,
+      email: email ?? null,
+      displayName: displayName || null,
       treeSeed: randomTreeSeed(),
       createdAt: now,
       updatedAt: now,
     })
-    .onConflictDoNothing({ target: accounts.authEmail });
+    .onConflictDoNothing({ target: accounts.authSubjectId });
 
   const account = await db.query.accounts.findFirst({
-    where: eq(accounts.authEmail, authEmail),
+    where: eq(accounts.authSubjectId, authSubjectId),
   });
   if (!account) {
     throw new Error("Account resolution failed.");
   }
   return account;
 }
+
+export async function resolveSocialAccount(
+  identity: VerifiedSocialIdentity,
+): Promise<Account> {
+  const db = getDb();
+  const linked = await db.query.socialAccounts.findFirst({
+    where: and(
+      eq(socialAccounts.provider, identity.provider),
+      eq(socialAccounts.providerUserId, identity.subject),
+    ),
+  });
+  if (linked) {
+    const account = await db.query.accounts.findFirst({
+      where: eq(accounts.id, linked.accountId),
+    });
+    if (!account) throw new AuthenticationRequiredError();
+    await refreshSocialAccount(linked.id, identity);
+    return mergeAccountProfile(account, identity);
+  }
+
+  const verifiedEmail =
+    identity.email && identity.emailVerified
+      ? normalizeProfileEmail(identity.email)
+      : undefined;
+  if (verifiedEmail) {
+    const byEmail = await db.query.accounts.findFirst({
+      where: eq(accounts.email, verifiedEmail),
+    });
+    if (byEmail) {
+      await attachSocialAccount(byEmail.id, identity);
+      return mergeAccountProfile(byEmail, identity);
+    }
+  }
+
+  if (!verifiedEmail) {
+    throw new AuthenticationRequiredError();
+  }
+
+  const account = await upsertAccountBySubject({
+    authSubjectId: socialSubjectId(identity.provider, identity.subject),
+    email: identity.email,
+    displayName: identity.displayName,
+  });
+  await attachSocialAccount(account.id, identity);
+  return account;
+}
+
+async function attachSocialAccount(
+  accountId: string,
+  identity: VerifiedSocialIdentity,
+): Promise<void> {
+  const now = Date.now();
+  const db = getDb();
+  await db
+    .insert(socialAccounts)
+    .values({
+      id: crypto.randomUUID(),
+      accountId,
+      provider: identity.provider,
+      providerUserId: identity.subject,
+      email: identity.email ? normalizeProfileEmail(identity.email) : null,
+      emailVerified: identity.emailVerified ? 1 : 0,
+      createdAt: now,
+      updatedAt: now,
+    })
+    .onConflictDoNothing({
+      target: [socialAccounts.provider, socialAccounts.providerUserId],
+    });
+}
+
+async function refreshSocialAccount(
+  socialAccountId: string,
+  identity: VerifiedSocialIdentity,
+): Promise<void> {
+  const db = getDb();
+  await db
+    .update(socialAccounts)
+    .set({
+      email: identity.email ? normalizeProfileEmail(identity.email) : null,
+      emailVerified: identity.emailVerified ? 1 : 0,
+      updatedAt: Date.now(),
+    })
+    .where(eq(socialAccounts.id, socialAccountId));
+}
+
+async function mergeAccountProfile(
+  account: Account,
+  identity: VerifiedSocialIdentity,
+): Promise<Account> {
+  return upsertAccountBySubject({
+    authSubjectId: account.authSubjectId,
+    email: identity.email ?? account.email ?? undefined,
+    displayName: identity.displayName ?? account.displayName ?? undefined,
+  });
+}
+
+export { isSocialProvider } from "./social-identity";
 
 function randomTreeSeed(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));

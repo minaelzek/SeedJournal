@@ -14,11 +14,25 @@
           "notNull": true,
           "autoincrement": false
         },
-        "auth_email": {
-          "name": "auth_email",
+        "auth_subject_id": {
+          "name": "auth_subject_id",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
+          "autoincrement": false
+        },
+        "email": {
+          "name": "email",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false,
           "autoincrement": false
         },
         "tree_seed": {
@@ -44,10 +58,10 @@
         }
       },
       "indexes": {
-        "accounts_auth_email_unique": {
-          "name": "accounts_auth_email_unique",
+        "accounts_auth_subject_id_unique": {
+          "name": "accounts_auth_subject_id_unique",
           "columns": [
-            "auth_email"
+            "auth_subject_id"
           ],
           "isUnique": true
         }

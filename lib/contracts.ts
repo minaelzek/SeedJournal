@@ -149,7 +149,7 @@ export interface TreeSnapshot {
 export interface TreeGrowthDelta {
   previousSequence: number;
   nextSequence: number;
-  events: TreeGrowthEvent[];
+  events: readonly TreeGrowthEvent[];
 }
 
 export interface ApiError {

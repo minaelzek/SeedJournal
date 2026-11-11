@@ -1,4 +1,4 @@
-/* Archive + entry reader — same craft system as home / ritual / reveal */
+/* Archive + entry reader — memory gallery film (same craft as home / ritual / reveal) */
 
 .sj-archive,
 .sj-entry-reader {
@@ -7,8 +7,29 @@
   min-height: 100dvh;
   color: var(--sj-color-text);
   background:
-    radial-gradient(circle at 50% -10%, rgb(255 255 255 / 72%), transparent 34rem),
+    radial-gradient(circle at 50% -10%, rgb(255 255 255 / 68%), transparent 36rem),
+    radial-gradient(ellipse 70% 40% at 50% 100%, rgb(232 200 196 / 10%), transparent 50%),
     var(--sj-color-void);
+  animation: sj-archive-enter var(--sj-motion-stage, 400ms)
+    var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+
+@keyframes sj-archive-enter {
+  from {
+    opacity: 0;
+    transform: translateY(0.45rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sj-archive,
+  .sj-entry-reader {
+    animation: none;
+  }
 }
 
 .sj-archive__shell,
@@ -90,9 +111,11 @@
   cursor: pointer;
   backdrop-filter: blur(0.75rem);
   transition:
+    transform var(--sj-motion-press, 100ms) var(--sj-ease-press, cubic-bezier(0.2, 0.9, 0.3, 1)),
     color var(--sj-motion-hover, 160ms) ease,
     border-color var(--sj-motion-hover, 160ms) ease,
-    background-color var(--sj-motion-hover, 160ms) ease;
+    background-color var(--sj-motion-hover, 160ms) ease,
+    box-shadow var(--sj-motion-hover, 160ms) ease;
 }
 
 .sj-archive__ghost-btn:hover,
@@ -119,6 +142,7 @@
   cursor: pointer;
   box-shadow: 0 0.55rem 1.8rem color-mix(in srgb, var(--sj-color-void) 14%, transparent);
   transition:
+    transform var(--sj-motion-press, 100ms) var(--sj-ease-press, cubic-bezier(0.2, 0.9, 0.3, 1)),
     background-color var(--sj-motion-hover, 160ms) ease,
     box-shadow var(--sj-motion-hover, 160ms) ease,
     opacity var(--sj-motion-hover, 160ms) ease;
@@ -126,7 +150,17 @@
 
 .sj-archive__primary-btn:hover,
 .sj-entry-reader__btn--primary:hover {
+  transform: translateY(-1px);
   background: color-mix(in srgb, var(--sj-color-text) 88%, var(--sj-color-leaf));
+}
+
+.sj-archive__primary-btn:active:not(:disabled),
+.sj-entry-reader__btn--primary:active:not(:disabled),
+.sj-archive__ghost-btn:active:not(:disabled),
+.sj-entry-reader__btn:active:not(:disabled),
+.sj-archive__row:active,
+.sj-archive__chip:active {
+  transform: scale(var(--sj-press-scale, 0.97));
 }
 
 .sj-archive__primary-btn:disabled,
@@ -170,6 +204,19 @@
 
 .sj-archive__tools {
   margin-bottom: 1.75rem;
+}
+
+.sj-archive__chip--on-this-day[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--sj-color-blossom) 42%, var(--sj-color-border));
+  color: color-mix(in srgb, var(--sj-color-text) 88%, var(--sj-color-blossom));
+  background: color-mix(in srgb, var(--sj-color-blossom-light) 55%, var(--sj-color-surface));
+}
+
+.sj-archive__on-this-day-note {
+  margin: 0.65rem 0 0;
+  color: var(--sj-color-text-muted);
+  font-size: 0.82rem;
+  line-height: 1.4;
 }
 
 .sj-archive__search {
@@ -312,22 +359,57 @@
 .sj-archive__row {
   width: 100%;
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 0.65rem;
-  padding: 1.55rem 0;
+  grid-template-columns: 1.1rem minmax(5.5rem, auto) minmax(0, 1fr);
+  gap: 0.65rem 0.85rem;
+  align-items: start;
+  padding: 1.25rem 0.85rem;
+  margin-inline: -0.85rem;
   border: 0;
-  border-bottom: 1px solid color-mix(in srgb, var(--sj-color-border) 80%, transparent);
+  border-radius: var(--sj-radius-surface, 1.5rem);
+  border-bottom: 1px solid transparent;
   color: inherit;
   background: transparent;
   text-align: left;
   cursor: pointer;
   font: inherit;
+  transition:
+    transform var(--sj-motion-press, 100ms) var(--sj-ease-press, cubic-bezier(0.2, 0.9, 0.3, 1)),
+    background-color var(--sj-motion-hover, 160ms) ease,
+    box-shadow var(--sj-motion-hover, 160ms) ease;
+}
+
+.sj-archive__row:hover {
+  background: color-mix(in srgb, var(--sj-color-surface) 72%, transparent);
+  box-shadow:
+    0 0.35rem 1.2rem color-mix(in srgb, var(--sj-color-void) 8%, transparent),
+    inset 0 1px 0 rgb(255 255 255 / 40%);
+  backdrop-filter: blur(0.6rem);
+}
+
+/* Botanical memory marker — equal beauty, not a grade ladder. */
+.sj-archive__petal-mark {
+  width: 0.72rem;
+  height: 0.72rem;
+  margin-top: 0.35rem;
+  border-radius: 50% 50% 45% 55%;
+  background: color-mix(in srgb, var(--sj-color-blossom) 70%, white);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sj-color-blossom-light) 55%, transparent);
+}
+
+.sj-archive__row-form {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 620;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--sj-color-blossom) 55%, var(--sj-color-text-muted));
 }
 
 @media (min-width: 40rem) {
   .sj-archive__row {
-    grid-template-columns: 8.5rem 1fr;
-    gap: 1.75rem;
+    grid-template-columns: 1.1rem 8.5rem minmax(0, 1fr);
+    gap: 0.85rem 1.25rem;
   }
 
   .sj-archive__shell,

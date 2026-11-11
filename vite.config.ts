@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import vinext from "vinext";
 import { defineConfig } from "vite";
 import hostingConfig from "./.openai/hosting.json";
@@ -33,6 +34,14 @@ const localBindingConfig = {
     : [],
 };
 
+// Prefer the local Wrangler file when it exists. Passing the same compatibility
+// flags and bindings inline as well makes the Cloudflare Vite plugin concatenate
+// duplicate config entries. The inline fallback keeps clean Sites/CI checkouts
+// self-contained when no local Wrangler file is present.
+const cloudflareWorkerConfig = existsSync("wrangler.toml")
+  ? { configPath: "./wrangler.toml" }
+  : { config: localBindingConfig };
+
 export default defineConfig(async () => {
   // Keep Wrangler and Miniflare state project-local. These are non-secret tool
   // settings; application environment belongs in ignored `.env*` files.
@@ -52,7 +61,7 @@ export default defineConfig(async () => {
       sites(),
       cloudflare({
         viteEnvironment: { name: "rsc", childEnvironments: ["ssr"] },
-        config: localBindingConfig,
+        ...cloudflareWorkerConfig,
       }),
     ],
   };

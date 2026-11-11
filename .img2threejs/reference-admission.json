@@ -1,0 +1,10 @@
+{
+  "admitted": true,
+  "viewpoint": "front-three-quarter",
+  "sourcePath": "C:\\Users\\minaa\\.codex\\generated_images\\019fce16-1e89-75a0-98c5-38d5ba139e51\\exec-d749cf74-2ed7-4e7b-a38b-bf7edd901190.png",
+  "technicalSuitability": "pass",
+  "foregroundCoverage": 0.3519,
+  "largestComponentFraction": 0.9983,
+  "duplicateOfHash": null,
+  "notes": "Single full-tree reference is suitable for a stylized procedural reconstruction. Hidden rear and root geometry remain approximate."
+}

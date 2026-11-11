@@ -86,11 +86,12 @@ export function careInvitation(input: {
   hasReturnBud?: boolean;
   reflectionCount?: number;
   rhythm?: CareRhythm | null;
+  nextChangeLabel?: string;
 }): CareInvitation {
   const reflectionCount = Math.max(0, Math.floor(input.reflectionCount ?? 0));
   const rhythm = input.rhythm ?? null;
   const tendedToday = rhythm?.tendedToday ?? false;
-  const currentRhythm = rhythm?.currentRhythm ?? 0;
+  const nextChangeLabel = input.nextChangeLabel?.trim() || undefined;
 
   if (input.hasUnfinishedReflection) {
     return {
@@ -113,83 +114,54 @@ export function careInvitation(input: {
         "Something you left with the sakura is ready to meet you again.",
       // Not shown as primary while return-bud owns the dock.
       ctaLabel: "Sit with this",
-      footnote:
-        reflectionCount === 0
-          ? "Your sakura is waiting patiently."
-          : `${reflectionCount} ${reflectionCount === 1 ? "reflection" : "reflections"} held in the sakura`,
+      footnote: quietFootnote(reflectionCount),
     };
   }
 
   if (tendedToday) {
     return {
       state: "tended",
-      eyebrow: "Today’s care is held",
-      // Short title — the sakura is the message.
+      eyebrow: "",
+      // The only line. No care badge, no reflection count.
       title: "Let it settle.",
-      description:
-        currentRhythm > 1
-          ? `${currentRhythm} quiet days of care are living in your sakura.`
-          : "Your sakura is carrying what you found.",
+      description: "",
       ctaLabel: "Write another page",
-      footnote:
-        reflectionCount === 0
-          ? "Your sakura is waiting patiently."
-          : `${reflectionCount} ${reflectionCount === 1 ? "reflection" : "reflections"} held in the sakura`,
+      footnote: "",
     };
   }
 
   if (!input.hasBegun) {
     return {
       state: "first",
-      eyebrow: "Plant a cherry stone",
-      title: "How are you, really?",
-      description:
-        "A few honest words wake the sakura. Deeper noticing opens pink life.",
+      eyebrow: "",
+      title: "A seed is waiting.",
+      description: "",
       ctaLabel: "Begin a reflection",
       footnote: "Your sakura is waiting patiently.",
     };
   }
 
-  // Open day — short top line; the sakura + CTA carry the habit pull.
-  if (currentRhythm > 1) {
-    return {
-      state: "open",
-      eyebrow: "Your sakura is waiting",
-      title: "Keep the rhythm.",
-      description: `${currentRhythm} quiet days of care are still yours.`,
-      ctaLabel: "Care for the sakura",
-      footnote:
-        reflectionCount === 0
-          ? "Your sakura is waiting patiently."
-          : `${reflectionCount} ${reflectionCount === 1 ? "reflection" : "reflections"} held in the sakura`,
-    };
-  }
-
-  if (currentRhythm === 1) {
-    return {
-      state: "open",
-      eyebrow: "Welcome back",
-      title: "One quiet return.",
-      description: "Yesterday’s care still counts.",
-      ctaLabel: "Care for the sakura",
-      footnote:
-        reflectionCount === 0
-          ? "Your sakura is waiting patiently."
-          : `${reflectionCount} ${reflectionCount === 1 ? "reflection" : "reflections"} held in the sakura`,
-    };
-  }
-
+  // Open day — the companion slept; it is still here. Never a day-count hook.
   return {
     state: "open",
-    eyebrow: "Welcome back",
-    title: "Your sakura is here.",
-    description: "Give it a moment of honest attention.",
+    eyebrow: "Your sakura is here",
+    title: "Your sakura slept.",
+    description: withOptionalNextChange("It is still here.", nextChangeLabel),
     ctaLabel: "Care for the sakura",
-    footnote:
-      reflectionCount === 0
-        ? "Your sakura is waiting patiently."
-        : `${reflectionCount} ${reflectionCount === 1 ? "reflection" : "reflections"} held in the sakura`,
+    footnote: quietFootnote(reflectionCount),
   };
+}
+
+/** Never a visible tally. An empty garden may still say it is waiting. */
+function quietFootnote(reflectionCount: number): string {
+  return reflectionCount === 0 ? "Your sakura is waiting patiently." : "";
+}
+
+function withOptionalNextChange(
+  base: string,
+  nextChangeLabel?: string,
+): string {
+  return nextChangeLabel ? `${base} ${nextChangeLabel}` : base;
 }
 
 /** Human-readable care rhythm line — botanical, never scored. */

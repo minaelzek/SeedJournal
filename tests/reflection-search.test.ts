@@ -61,6 +61,20 @@ describe("local decrypted archive search", () => {
     ]);
   });
 
+  it("filters On this day by shared calendar month-day across years", () => {
+    const march = entry("march-23", "A spring page.", "moment", 300);
+    march.localDay = "2023-03-15";
+    const marchLater = entry("march-24", "Another spring.", "moment", 400);
+    marchLater.localDay = "2024-03-15";
+    const july = entry("july", "Summer heat.", "change", 500);
+    july.localDay = "2024-07-01";
+
+    const hits = searchEntries([march, marchLater, july], {
+      onThisDayLocalDay: "2026-03-15",
+    });
+    expect(hits.map((item) => item.id)).toEqual(["march-24", "march-23"]);
+  });
+
   it("indexes the deeper reflection without exposing it outside local search", () => {
     const layered = entry("layered", "I am sitting with this.", "moment", 300);
     layered.payload.secondFollowUp = {

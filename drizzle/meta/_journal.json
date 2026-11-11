@@ -15,6 +15,13 @@
       "when": 1785361910337,
       "tag": "0001_broad_randall_flagg",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1786728109661,
+      "tag": "0002_pink_maximus",
+      "breakpoints": true
     }
   ]
 }

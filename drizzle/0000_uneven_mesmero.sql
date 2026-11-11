@@ -1,12 +1,14 @@
 CREATE TABLE `accounts` (
 	`id` text PRIMARY KEY NOT NULL,
-	`auth_email` text NOT NULL,
+	`auth_subject_id` text NOT NULL,
+	`email` text,
+	`display_name` text,
 	`tree_seed` text NOT NULL,
 	`created_at` integer NOT NULL,
 	`updated_at` integer NOT NULL
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `accounts_auth_email_unique` ON `accounts` (`auth_email`);--> statement-breakpoint
+CREATE UNIQUE INDEX `accounts_auth_subject_id_unique` ON `accounts` (`auth_subject_id`);--> statement-breakpoint
 CREATE TABLE `entries` (
 	`id` text NOT NULL,
 	`account_id` text NOT NULL,

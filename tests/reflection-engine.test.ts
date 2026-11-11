@@ -60,6 +60,15 @@ describe("private reflection engine", () => {
     expect(result.selectedTarget).toBe("deepen");
   });
 
+  it("hears implicit affect in a short sentence like “today was a great day”", () => {
+    const result = evaluateReflection("Today was a great day.", {
+      category: "moment",
+    });
+    expect(result.mode).toBe("english-rules");
+    expect(result.strengths.emotion).toBeGreaterThan(0);
+    expect(result.selectedTarget).toBe("emotion");
+  });
+
   it("does not treat a long but unreflective string as deep", () => {
     const result = evaluateReflection(
       "table table table table table table table table table table table table table table table table",
@@ -89,6 +98,21 @@ describe("private reflection engine", () => {
       "今日は静かな公園を歩きながら、最近の変化についてゆっくり考えました。まだ答えはありませんが、この時間を大切にしたいです。";
     expect(getReflectionMode(body)).toBe("language-neutral");
     expect(evaluateReflection(body).selectedTarget).toBe("language-neutral");
+  });
+
+  it("does not count a negated emotion word such as “I am not sad”", () => {
+    const result = evaluateReflection("I am not sad about the weather.");
+    expect(result.strengths.emotion).toBe(0);
+    const distant = evaluateReflection(
+      "I am not really that very sad today.",
+    );
+    expect(distant.strengths.emotion).toBe(0);
+  });
+
+  it("does not score “I felt sad sad sad” higher than “I felt sad”", () => {
+    const once = evaluateReflection("I felt sad.");
+    const repeated = evaluateReflection("I felt sad sad sad.");
+    expect(repeated.strengths.emotion).toBe(once.strengths.emotion);
   });
 });
 
@@ -156,7 +180,18 @@ describe("growth mapping", () => {
     },
   };
 
-  it("creates a luminous blossom only when all signals and authored stages exist", () => {
+  it("lets a follow-up and a carry line raise three signals to 4 and four signals to 6", () => {
+    const withSignals = (count: number) => ({
+      ...englishReflection,
+      strengths: {
+        context: (count > 0 ? 1 : 0) as 0 | 1,
+        emotion: (count > 1 ? 1 : 0) as 0 | 1,
+        meaning: (count > 2 ? 1 : 0) as 0 | 1,
+        perspective: (count > 3 ? 1 : 0) as 0 | 1,
+        integration: (count > 4 ? 1 : 0) as 0 | 1,
+      },
+    });
+
     expect(
       mapReflectionToGrowth({
         entryId: "entry-1",
@@ -166,6 +201,68 @@ describe("growth mapping", () => {
         seedInsightAdded: true,
       }),
     ).toMatchObject({ memoryForm: "luminous-blossom", growthUnits: 6 });
+
+    expect(
+      mapReflectionToGrowth({
+        entryId: "entry-four",
+        reflection: withSignals(4),
+        body: "Four signals, both stages answered.",
+        followUpAnswered: true,
+        seedInsightAdded: true,
+      }),
+    ).toMatchObject({ memoryForm: "luminous-blossom", growthUnits: 6, signalCount: 4 });
+
+    expect(
+      mapReflectionToGrowth({
+        entryId: "entry-four-open",
+        reflection: withSignals(4),
+        body: "Four signals, nothing answered after the page.",
+        followUpAnswered: false,
+        seedInsightAdded: false,
+      }),
+    ).toMatchObject({ memoryForm: "blossom", growthUnits: 4 });
+
+    expect(
+      mapReflectionToGrowth({
+        entryId: "entry-three",
+        reflection: withSignals(3),
+        body: "Three signals, both stages answered.",
+        followUpAnswered: true,
+        seedInsightAdded: true,
+      }),
+    ).toMatchObject({ memoryForm: "blossom", growthUnits: 4, signalCount: 3 });
+
+    expect(
+      mapReflectionToGrowth({
+        entryId: "entry-three-open",
+        reflection: withSignals(3),
+        body: "Three signals, nothing answered after the page.",
+        followUpAnswered: false,
+        seedInsightAdded: false,
+      }),
+    ).toMatchObject({ memoryForm: "bud", growthUnits: 2 });
+
+    const floor = mapReflectionToGrowth({
+      entryId: "entry-floor",
+      reflection: withSignals(0),
+      body: "No signals.",
+      followUpAnswered: false,
+      seedInsightAdded: false,
+    });
+    expect(floor.growthUnits).toBe(1);
+    expect(floor.growthUnits).toBeGreaterThan(0);
+  });
+
+  it("still grows a leaf when the writing is heavy or thin", () => {
+    const thin = mapReflectionToGrowth({
+      entryId: "entry-heavy",
+      body: "I felt so sad and empty after the loss.",
+      followUpAnswered: false,
+      seedInsightAdded: false,
+    });
+    expect(thin.growthUnits).toBeGreaterThanOrEqual(1);
+    expect(thin.memoryForm).toBe("leaf");
+    expect([1, 2, 4, 6]).toContain(thin.growthUnits);
   });
 
   it("lets language-neutral writers reach every tier through ritual completion", () => {

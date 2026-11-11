@@ -11,13 +11,16 @@ import {
 import {
   ArrowLeft,
   DownloadSimple,
-  Key,
-  LockKey,
   SignOut,
   Trash,
 } from "@phosphor-icons/react";
+import Link from "next/link";
 import { ArchiveView, EntryReader } from "@/features/archive";
 import type { GardenMemoryRecord } from "@/features/garden";
+import {
+  clearPendingTreeSeed,
+  readPendingTreeSeed,
+} from "@/features/garden/pendingTreeSeed";
 import {
   createCareRhythm,
   GrowthReveal,
@@ -29,7 +32,7 @@ import {
   type DecryptedJournalEntry,
   type JournalRitualDraft,
 } from "@/features/journal";
-import { weatherForEntry } from "@/features/reflection";
+import { weatherForEntry, type GardenWeather } from "@/features/reflection";
 import { AppFrame, SeedJournalHeader, TreeFirstHome } from "@/features/shell";
 import type {
   EncryptedEntryEnvelope,
@@ -39,11 +42,9 @@ import type {
   TreeSnapshot,
 } from "@/lib/contracts";
 import {
-  createVault,
   decryptEntryPayload,
   encryptEntryPayload,
-  rewrapVault,
-  unlockVault,
+  importVaultKeyFromBase64,
   type ClientVaultMetadata,
 } from "@/lib/crypto";
 import {
@@ -72,8 +73,11 @@ interface BootstrapResponse {
     id: string;
     treeSeed: string;
     treeAlgorithmVersion: 1 | 2;
+    email?: string | null;
+    displayName?: string | null;
   };
-  vault: { configured: boolean };
+  vault: { configured: boolean; wrap?: "session" | "passphrase" };
+  dataKey?: string;
   journal: { entryCount: number };
   csrfToken: string;
 }
@@ -94,6 +98,14 @@ interface PendingGrowthReveal {
   seedInsight?: string;
 }
 
+type SyncState = "idle" | "syncing" | "offline" | "error";
+type SessionClearReason = "lock" | "logout" | "timeout" | "auth-failure" | "account-delete";
+
+interface LocalCleanupFailure {
+  accountId: string;
+  message: string;
+}
+
 export function SeedJournalApp({
   initialPath,
   displayName,
@@ -104,20 +116,48 @@ export function SeedJournalApp({
   const [vaultKey, setVaultKey] = useState<CryptoKey | null>(null);
   const [envelopes, setEnvelopes] = useState<EncryptedEntryEnvelope[]>([]);
   const envelopeRef = useRef(new Map<string, EncryptedEntryEnvelope>());
+  const bootstrapRef = useRef<BootstrapResponse | undefined>(undefined);
   const [entries, setEntries] = useState<DecryptedJournalEntry[]>([]);
   const [growthEvents, setGrowthEvents] = useState<TreeGrowthEvent[]>([]);
   const growthEventsRef = useRef<TreeGrowthEvent[]>([]);
   const entryMutationQueuesRef = useRef(new Map<string, Promise<unknown>>());
+  const sessionEpochRef = useRef(0);
+  const flushInFlightRef = useRef<Promise<void> | null>(null);
   const [loadingMessage, setLoadingMessage] = useState("Opening your garden…");
   const [error, setError] = useState<string>();
+  const [authFailure, setAuthFailure] = useState(false);
+  const [syncState, setSyncState] = useState<SyncState>("idle");
+  const [syncMessage, setSyncMessage] = useState<string>();
+  const [localCleanupFailure, setLocalCleanupFailure] =
+    useState<LocalCleanupFailure>();
   const [activeEntryId, setActiveEntryId] = useState(() => crypto.randomUUID());
+  const [resumedEntryId, setResumedEntryId] = useState<string | null>(null);
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null);
+  const [ceremonyComplete, setCeremonyComplete] = useState(false);
   const [growthRevealQueue, setGrowthRevealQueue] = useState<
     PendingGrowthReveal[]
   >([]);
   const [visualTestUnits] = useState<number | null>(readVisualTestUnits);
   const [visualPreviewEpoch] = useState(() => Date.now());
   const reducedMotion = useReducedMotionPreference();
+  const [draftWeather, setDraftWeather] = useState<GardenWeather | null>(null);
+  const weatherTimerRef = useRef(0);
+  const suppressDraftResumeRef = useRef(false);
+  const routeRef = useRef(route);
+  useEffect(() => {
+    routeRef.current = route;
+  });
+  const handleAtmosphere = useCallback((entry: JournalEntryPayloadV1) => {
+    window.clearTimeout(weatherTimerRef.current);
+    weatherTimerRef.current = window.setTimeout(() => {
+      if (routeRef.current.name !== "new") return;
+      setDraftWeather(weatherForEntry(entry));
+    }, 280);
+  }, []);
+
+  useEffect(() => {
+    return () => window.clearTimeout(weatherTimerRef.current);
+  }, []);
 
   const navigate = useCallback((next: Route) => {
     const path = pathForRoute(next);
@@ -126,12 +166,63 @@ export function SeedJournalApp({
   }, []);
 
   useEffect(() => {
+    bootstrapRef.current = bootstrap;
+  }, [bootstrap]);
+
+  const clearPlaintextSession = useCallback(
+    (reason: SessionClearReason) => {
+      sessionEpochRef.current += 1;
+      entryMutationQueuesRef.current.clear();
+      envelopeRef.current.clear();
+      growthEventsRef.current = [];
+      setVaultKey(null);
+      setEnvelopes([]);
+      setEntries([]);
+      setGrowthEvents([]);
+      setSelectedEntryId(null);
+      setGrowthRevealQueue([]);
+      setActiveEntryId(crypto.randomUUID());
+      setSyncState("idle");
+      setSyncMessage(undefined);
+      setError(undefined);
+      setAuthFailure(reason === "auth-failure");
+
+      bootstrapRef.current = undefined;
+      setBootstrap(undefined);
+      setVault(undefined);
+
+      if (reason === "lock") {
+        setError("The garden is locked. Sign in to open it again.");
+        window.location.replace("/welcome");
+        return;
+      }
+      if (reason === "timeout") {
+        setError("The garden locked after a quiet stretch. Sign in to open it again.");
+        window.location.replace("/welcome");
+        return;
+      }
+      if (reason === "auth-failure" || reason === "logout") {
+        setError(
+          reason === "logout"
+            ? undefined
+            : "Your sign-in session has expired. Please sign in again.",
+        );
+        window.location.replace("/welcome");
+        return;
+      }
+      navigate({ name: "home" });
+    },
+    [navigate],
+  );
+
+  useEffect(() => {
     const onPopState = () => setRoute(routeFromPath(window.location.pathname));
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
   useEffect(() => {
+    if (route.name === "new") return;
     const target = document.getElementById("main-content");
     if (!target) return;
     target.setAttribute("tabindex", "-1");
@@ -150,8 +241,16 @@ export function SeedJournalApp({
   useEffect(() => {
     void (async () => {
       try {
-        const response = await fetchJson<BootstrapResponse>("/api/bootstrap");
+        const response = await adoptPendingTreeSeed(
+          await fetchJson<BootstrapResponse>("/api/bootstrap"),
+        );
         setBootstrap(response);
+        if (response.dataKey) {
+          const key = await importVaultKeyFromBase64(response.dataKey);
+          setVault(sessionVaultStub(response));
+          setVaultKey(key);
+          return;
+        }
         if (!response.vault.configured) {
           setVault(null);
           return;
@@ -160,65 +259,61 @@ export function SeedJournalApp({
           "/api/vault",
         );
         setVault(vaultResponse.vault);
-      } catch {
-        if (process.env.NODE_ENV === "development") {
-          const created = await createVault("seed-journal-local-preview");
-          const now = Date.now();
-          const previewAccount: BootstrapResponse = {
-            account: {
-              id: "00000000-0000-4000-8000-000000000001",
-              treeSeed: "seed-journal-preview-tree",
-              treeAlgorithmVersion: 2,
-            },
-            vault: { configured: true },
-            journal: { entryCount: 1 },
-            csrfToken: "",
-          };
-          const preview = previewEntry(now);
-          const previewEnvelope = await encryptEntryPayload(
-            created.vaultKey,
-            previewAccount.account.id,
-            preview.payload,
-            {
-              id: preview.id,
-              state: "complete",
-              revision: 1,
-              clientCreatedAt: preview.createdAt,
-              clientUpdatedAt: preview.updatedAt,
-              completedAt: preview.completedAt,
-              localDay: preview.localDay,
-            },
-          );
-          setBootstrap(previewAccount);
-          setVault({ ...created.metadata, revision: 1, updatedAt: now });
-          setVaultKey(created.vaultKey);
-          envelopeRef.current = new Map([[preview.id, previewEnvelope]]);
-          setEnvelopes([previewEnvelope]);
-          setEntries([preview]);
-          const previewEvents = previewGrowth(now);
-          growthEventsRef.current = previewEvents;
-          setGrowthEvents(previewEvents);
-          setLoadingMessage("");
+      } catch (caught) {
+        if (isAuthenticationFailure(caught)) {
+          clearPlaintextSession("auth-failure");
+          window.location.replace("/welcome");
         } else {
+          const status = getSyncStatusForFailure(caught);
+          setSyncState(status.state);
+          setSyncMessage(status.message);
           setError("Your private garden could not be opened. Please try again.");
         }
       }
     })();
-  }, []);
+  }, [clearPlaintextSession]);
 
   const mutate = useCallback(
     async <T,>(url: string, method: string, body: unknown): Promise<T> => {
-      if (!bootstrap) throw new Error("The private session is not ready.");
-      return fetchJson<T>(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          "x-seedjournal-csrf": bootstrap.csrfToken,
-        },
-        body: JSON.stringify(body),
-      });
+      const currentBootstrap = bootstrapRef.current;
+      if (!currentBootstrap) {
+        throw new Error("The private session is not ready.");
+      }
+      const send = (session: BootstrapResponse) =>
+        fetchJson<T>(url, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+            "x-seedjournal-csrf": session.csrfToken,
+          },
+          body: JSON.stringify(body),
+        });
+
+      try {
+        return await send(currentBootstrap);
+      } catch (caught) {
+        if (isAuthenticationFailure(caught)) {
+          clearPlaintextSession("auth-failure");
+          throw caught;
+        }
+        if (!isExpiredCsrf(caught)) throw caught;
+
+        try {
+          const refreshed = await fetchJson<BootstrapResponse>(
+            "/api/bootstrap",
+          );
+          bootstrapRef.current = refreshed;
+          setBootstrap(refreshed);
+          return await send(refreshed);
+        } catch (refreshError) {
+          if (isAuthenticationFailure(refreshError)) {
+            clearPlaintextSession("auth-failure");
+          }
+          throw refreshError;
+        }
+      }
     },
-    [bootstrap],
+    [clearPlaintextSession],
   );
 
   const runEntryMutation = useCallback(
@@ -243,7 +338,16 @@ export function SeedJournalApp({
 
   const appendUnseenGrowthEvents = useCallback(
     (incoming: readonly TreeGrowthEvent[]) => {
-      const current = growthEventsRef.current;
+      const current = growthEventsRef.current.filter((event) => {
+        if (!event.entryId || !event.kind.startsWith("memory_")) return true;
+        const incomingSame = incoming.some(
+          (next) =>
+            next.entryId === event.entryId &&
+            next.kind.startsWith("memory_") &&
+            next.id !== event.id,
+        );
+        return !incomingSame;
+      });
       const knownIds = new Set(current.map((event) => event.id));
       const knownSequences = new Set(current.map((event) => event.sequence));
       const unseen = incoming
@@ -294,6 +398,8 @@ export function SeedJournalApp({
   const loadJournal = useCallback(
     async (key: CryptoKey) => {
       if (!bootstrap) return;
+      const sessionEpoch = sessionEpochRef.current;
+      const accountId = bootstrap.account.id;
       setLoadingMessage("Restoring your memories…");
       const allEnvelopes: EncryptedEntryEnvelope[] = [];
       const events: TreeGrowthEvent[] = [];
@@ -324,10 +430,18 @@ export function SeedJournalApp({
           hasMore = page.hasMore;
         }
       } catch (caught) {
+        if (isAuthenticationFailure(caught)) {
+          clearPlaintextSession("auth-failure");
+          throw caught;
+        }
         if (!isNetworkFailure(caught)) throw caught;
+        const status = getSyncStatusForFailure(caught);
+        setSyncState(status.state);
+        setSyncMessage(status.message);
       }
 
-      const localDrafts = await listEncryptedDrafts(bootstrap.account.id);
+      const localDrafts = await listEncryptedDrafts(accountId);
+      if (sessionEpoch !== sessionEpochRef.current) return;
       const mergedEnvelopes = new Map(
         allEnvelopes.map((envelope) => [envelope.id, envelope]),
       );
@@ -343,7 +457,7 @@ export function SeedJournalApp({
         try {
           const payload = await decryptEntryPayload(
             key,
-            bootstrap.account.id,
+            accountId,
             envelope,
           );
           decrypted.push({
@@ -363,6 +477,8 @@ export function SeedJournalApp({
         }
       }
 
+      if (sessionEpoch !== sessionEpochRef.current) return;
+
       envelopeRef.current = new Map(
         restoredEnvelopes.map((envelope) => [envelope.id, envelope]),
       );
@@ -373,47 +489,45 @@ export function SeedJournalApp({
           (left.completedAt ?? left.updatedAt),
       );
       setEntries(sortedEntries);
-      if (window.location.pathname === "/journal/new") {
+      if (
+        window.location.pathname === "/journal/new" &&
+        !suppressDraftResumeRef.current
+      ) {
         const resumableDraft = sortedEntries.find(
           (entry) => !entry.completedAt && entry.payload.body.trim().length > 0,
         );
-        if (resumableDraft) setActiveEntryId(resumableDraft.id);
+        if (resumableDraft) {
+          setResumedEntryId(resumableDraft.id);
+          setActiveEntryId(resumableDraft.id);
+        }
       }
       growthEventsRef.current = events;
       setGrowthEvents(events);
       setLoadingMessage("");
     },
-    [bootstrap],
+    [bootstrap, clearPlaintextSession],
   );
 
-  const createPrivateVault = async (passphrase: string) => {
-    if (!bootstrap) return;
-    const created = await createVault(passphrase);
-    const response = await mutate<{ vault: StoredVault }>(
-      "/api/vault",
-      "POST",
-      created.metadata,
-    );
-    setVault(response.vault);
-    setVaultKey(created.vaultKey);
-    await loadJournal(created.vaultKey);
-  };
-
-  const unlockPrivateVault = async (passphrase: string) => {
-    if (!vault) return;
-    const key = await unlockVault(vault, passphrase);
-    setVaultKey(key);
-    await loadJournal(key);
-  };
+  useEffect(() => {
+    if (!bootstrap || !vaultKey) return;
+    void loadJournal(vaultKey).catch((caught: unknown) => {
+      if (isAuthenticationFailure(caught)) return;
+      setError("Your memories could not be restored. Please try again.");
+    });
+  }, [bootstrap, loadJournal, vaultKey]);
 
   const saveDraftNow = useCallback(
     async (entryId: string, payload: JournalEntryPayloadV1) => {
       if (!bootstrap || !vaultKey) return;
+      const sessionEpoch = sessionEpochRef.current;
+      const accountId = bootstrap.account.id;
+      const isCurrentSession = () =>
+        sessionEpoch === sessionEpochRef.current;
       const existing = envelopeRef.current.get(entryId);
       const now = Date.now();
       const envelope = await encryptEntryPayload(
         vaultKey,
-        bootstrap.account.id,
+        accountId,
         payload,
         {
           id: entryId,
@@ -423,9 +537,11 @@ export function SeedJournalApp({
           clientUpdatedAt: now,
         },
       );
-      await putEncryptedDraft(bootstrap.account.id, envelope);
+      if (!isCurrentSession()) return;
+      await putEncryptedDraft(accountId, envelope);
+      if (!isCurrentSession()) return;
       let storedEnvelope: EncryptedEntryEnvelope;
-      if (!bootstrap.csrfToken) {
+      if (!bootstrapRef.current?.csrfToken) {
         // The development preview has no server session; the encrypted local
         // draft is still a successful save in that mode.
         storedEnvelope = envelope;
@@ -443,29 +559,35 @@ export function SeedJournalApp({
                 envelope,
               );
           storedEnvelope = response.entry;
-          await removeEncryptedDraft(bootstrap.account.id, entryId);
+          await removeEncryptedDraft(accountId, entryId);
         } catch (caught) {
           if (!isNetworkFailure(caught)) throw caught;
+          if (!isCurrentSession()) return;
           const operation: EncryptedOutboxOperation = existing
             ? {
-                operationId: `draft:${bootstrap.account.id}:${entryId}:${envelope.revision}`,
-                accountId: bootstrap.account.id,
+                operationId: `draft:${accountId}:${entryId}:${envelope.revision}`,
+                accountId,
                 createdAt: now,
                 kind: "update",
                 expectedRevision: existing.revision,
                 envelope,
               }
             : {
-                operationId: `draft:${bootstrap.account.id}:${entryId}:${envelope.revision}`,
-                accountId: bootstrap.account.id,
+                operationId: `draft:${accountId}:${entryId}:${envelope.revision}`,
+                accountId,
                 createdAt: now,
                 kind: "create",
                 envelope,
               };
           await enqueueEncryptedOperation(operation);
+          const status = getSyncStatusForFailure(caught);
+          setSyncState(status.state);
+          setSyncMessage(status.message);
           storedEnvelope = envelope;
         }
       }
+
+      if (!isCurrentSession()) return;
       envelopeRef.current.set(entryId, storedEnvelope);
       setEnvelopes(Array.from(envelopeRef.current.values()));
       setEntries((current) => {
@@ -494,9 +616,14 @@ export function SeedJournalApp({
     (entryId: string, payload: JournalEntryPayloadV1, localDay: string) =>
       runEntryMutation(entryId, async () => {
         if (!bootstrap || !vaultKey || !payload.growth) return;
+        const sessionEpoch = sessionEpochRef.current;
+        const accountId = bootstrap.account.id;
+        const isCurrentSession = () =>
+          sessionEpoch === sessionEpochRef.current;
         let existing = envelopeRef.current.get(entryId);
         if (!existing) {
           await saveDraftNow(entryId, payload);
+          if (!isCurrentSession()) return;
           existing = envelopeRef.current.get(entryId);
         }
         if (!existing) throw new Error("The draft could not be prepared.");
@@ -511,20 +638,22 @@ export function SeedJournalApp({
         let completionBase = existing;
         let completionEnvelope = await createCompletionEnvelope(
           vaultKey,
-          bootstrap.account.id,
+          accountId,
           payload,
           completionBase,
           completedAt,
           localDay,
         );
+        if (!isCurrentSession()) return;
         let response:
           | {
               entry: EncryptedEntryEnvelope;
               events: TreeGrowthEvent[];
             }
           | undefined;
+        let serverConfirmed = false;
 
-        if (!bootstrap.csrfToken) {
+        if (!bootstrapRef.current?.csrfToken) {
           const memoryKind = `memory_${completion.memoryForm.replace("-", "_")}` as TreeGrowthEvent["kind"];
           const localEvent: TreeGrowthEvent = {
             id: completion.id,
@@ -537,11 +666,14 @@ export function SeedJournalApp({
             growthUnits: completion.growthUnits,
             seed: completion.seed,
           };
-          await putEncryptedDraft(bootstrap.account.id, completionEnvelope);
+          await putEncryptedDraft(accountId, completionEnvelope);
+          if (!isCurrentSession()) return;
           response = {
             entry: completionEnvelope,
             events: [...growthEventsRef.current, localEvent],
           };
+          // Local-only (no CSRF session) still yields growth + reveal.
+          serverConfirmed = true;
         } else {
           for (let attempt = 0; attempt < 2 && !response; attempt += 1) {
             try {
@@ -554,7 +686,12 @@ export function SeedJournalApp({
                   completion,
                 },
               );
+              serverConfirmed = true;
             } catch (caught) {
+              if (isAuthenticationFailure(caught)) {
+                clearPlaintextSession("auth-failure");
+                throw caught;
+              }
               if (attempt === 0 && isRevisionConflict(caught)) {
                 const latest = await fetchJson<{
                   entry: EncryptedEntryEnvelope;
@@ -563,7 +700,7 @@ export function SeedJournalApp({
                   completionBase = latest.entry;
                   completionEnvelope = await createCompletionEnvelope(
                     vaultKey,
-                    bootstrap.account.id,
+                    accountId,
                     payload,
                     completionBase,
                     completedAt,
@@ -575,13 +712,11 @@ export function SeedJournalApp({
               }
 
               if (isNetworkFailure(caught)) {
-                await putEncryptedDraft(
-                  bootstrap.account.id,
-                  completionEnvelope,
-                );
+                if (!isCurrentSession()) return;
+                await putEncryptedDraft(accountId, completionEnvelope);
                 await enqueueEncryptedOperation({
-                  operationId: `complete:${bootstrap.account.id}:${entryId}:${completion.id}`,
-                  accountId: bootstrap.account.id,
+                  operationId: `complete:${accountId}:${entryId}:${completion.id}`,
+                  accountId,
                   createdAt: completedAt,
                   kind: "complete",
                   expectedRevision: completionBase.revision,
@@ -590,6 +725,32 @@ export function SeedJournalApp({
                 });
                 envelopeRef.current.set(entryId, completionEnvelope);
                 setEnvelopes(Array.from(envelopeRef.current.values()));
+                const status = getSyncStatusForFailure(caught);
+                setSyncState(status.state);
+                setSyncMessage(status.message);
+                // Optimistic local growth — never "Nurture" without a botanical receipt.
+                const memoryKind =
+                  `memory_${completion.memoryForm.replace("-", "_")}` as TreeGrowthEvent["kind"];
+                const optimisticEvent: TreeGrowthEvent = {
+                  id: completion.id,
+                  sequence:
+                    Math.max(
+                      0,
+                      ...growthEventsRef.current.map((event) => event.sequence),
+                    ) + 1,
+                  entryId,
+                  occurredAt: completedAt,
+                  localDate: localDay,
+                  kind: memoryKind,
+                  growthUnits: completion.growthUnits,
+                  seed: completion.seed,
+                };
+                response = {
+                  entry: completionEnvelope,
+                  events: [...growthEventsRef.current, optimisticEvent],
+                };
+                serverConfirmed = false;
+                break;
               }
               throw caught;
             }
@@ -599,7 +760,12 @@ export function SeedJournalApp({
         if (!response) {
           throw new Error("The completed reflection could not be confirmed.");
         }
-        await removeEncryptedDraft(bootstrap.account.id, entryId);
+        if (!isCurrentSession()) return;
+        // Offline outbox still holds the complete envelope; keep local draft until sync.
+        if (serverConfirmed) {
+          await removeEncryptedDraft(accountId, entryId);
+        }
+        if (!isCurrentSession()) return;
         envelopeRef.current.set(entryId, response.entry);
         setEnvelopes(Array.from(envelopeRef.current.values()));
         setEntries((current) => [
@@ -615,10 +781,16 @@ export function SeedJournalApp({
         ]);
         const unseenGrowth = appendUnseenGrowthEvents(response.events);
         enqueueGrowthReveal(unseenGrowth, entryId, payload.seedInsight);
+        void import("@/features/growth/careReminder").then((module) => {
+          if (!module.readGentleCareNoteEnabled()) {
+            module.writeGentleCareNoteEnabled(true);
+          }
+        });
       }),
     [
       appendUnseenGrowthEvents,
       bootstrap,
+      clearPlaintextSession,
       enqueueGrowthReveal,
       mutate,
       runEntryMutation,
@@ -642,88 +814,134 @@ export function SeedJournalApp({
   );
 
   const flushEncryptedOutbox = useCallback(async () => {
-    if (!bootstrap || !vaultKey || !navigator.onLine) return;
-    const operations = await listEncryptedOperations(bootstrap.account.id);
+    if (flushInFlightRef.current) return flushInFlightRef.current;
 
-    for (const operation of operations) {
+    const task = (async () => {
+      const session = bootstrapRef.current;
+      if (!session || !vaultKey || !navigator.onLine) return;
+      const sessionEpoch = sessionEpochRef.current;
+      const accountId = session.account.id;
+      setSyncState("syncing");
+      setSyncMessage("Syncing your changes…");
+
+      let operations: EncryptedOutboxOperation[];
       try {
-        if (operation.kind === "delete") {
-          await mutate(`/api/entries/${operation.entryId}`, "DELETE", {
-            expectedRevision: operation.expectedRevision,
-          });
-        } else if (operation.kind === "create") {
-          const response = await mutate<{ entry: EncryptedEntryEnvelope }>(
-            "/api/entries",
-            "POST",
-            operation.envelope,
-          );
-          envelopeRef.current.set(response.entry.id, response.entry);
-        } else if (operation.kind === "update") {
-          const response = await mutate<{ entry: EncryptedEntryEnvelope }>(
-            `/api/entries/${operation.envelope.id}`,
-            "PUT",
-            {
-              expectedRevision: operation.expectedRevision,
-              envelope: operation.envelope,
-            },
-          );
-          envelopeRef.current.set(response.entry.id, response.entry);
-        } else {
-          const response = await mutate<{
-            entry: EncryptedEntryEnvelope;
-            events: TreeGrowthEvent[];
-          }>(`/api/entries/${operation.envelope.id}/complete`, "POST", {
-            expectedRevision: operation.expectedRevision,
-            envelope: operation.envelope,
-            completion: operation.completion,
-          });
-          envelopeRef.current.set(response.entry.id, response.entry);
-          const payload = await decryptEntryPayload(
-            vaultKey,
-            bootstrap.account.id,
-            response.entry,
-          );
-          setEntries((current) => [
-            {
-              id: response.entry.id,
-              payload,
-              createdAt: response.entry.clientCreatedAt,
-              updatedAt: response.entry.clientUpdatedAt,
-              ...(response.entry.completedAt === undefined
-                ? {}
-                : { completedAt: response.entry.completedAt }),
-              ...(response.entry.localDay === undefined
-                ? {}
-                : { localDay: response.entry.localDay }),
-            },
-            ...current.filter((entry) => entry.id !== response.entry.id),
-          ]);
-          const unseenGrowth = appendUnseenGrowthEvents(response.events);
-          if (unseenGrowth.length > 0) {
-            enqueueGrowthReveal(
-              unseenGrowth,
-              response.entry.id,
-              payload.seedInsight,
-            );
-            navigate({ name: "home" });
-          }
-        }
-
-        const entryId =
-          operation.kind === "delete"
-            ? operation.entryId
-            : operation.envelope.id;
-        await removeEncryptedOperation(operation.operationId);
-        await removeEncryptedDraft(bootstrap.account.id, entryId);
-        setEnvelopes(Array.from(envelopeRef.current.values()));
-      } catch {
-        // Preserve ordering and retry the remaining encrypted operations later.
-        break;
+        operations = await listEncryptedOperations(accountId);
+      } catch (caught) {
+        const status = getSyncStatusForFailure(caught);
+        setSyncState(status.state);
+        setSyncMessage(status.message);
+        return;
       }
-    }
+
+      let failed = false;
+      for (const operation of operations) {
+        if (sessionEpoch !== sessionEpochRef.current) return;
+        try {
+          await retryWithBackoff(async () => {
+            if (operation.kind === "delete") {
+              await mutate(`/api/entries/${operation.entryId}`, "DELETE", {
+                expectedRevision: operation.expectedRevision,
+              });
+              envelopeRef.current.delete(operation.entryId);
+            } else if (operation.kind === "create") {
+              const response = await mutate<{ entry: EncryptedEntryEnvelope }>(
+                "/api/entries",
+                "POST",
+                operation.envelope,
+              );
+              envelopeRef.current.set(response.entry.id, response.entry);
+            } else if (operation.kind === "update") {
+              const response = await mutate<{ entry: EncryptedEntryEnvelope }>(
+                `/api/entries/${operation.envelope.id}`,
+                "PUT",
+                {
+                  expectedRevision: operation.expectedRevision,
+                  envelope: operation.envelope,
+                },
+              );
+              envelopeRef.current.set(response.entry.id, response.entry);
+            } else {
+              const response = await mutate<{
+                entry: EncryptedEntryEnvelope;
+                events: TreeGrowthEvent[];
+              }>(`/api/entries/${operation.envelope.id}/complete`, "POST", {
+                expectedRevision: operation.expectedRevision,
+                envelope: operation.envelope,
+                completion: operation.completion,
+              });
+              if (sessionEpoch !== sessionEpochRef.current) return;
+              envelopeRef.current.set(response.entry.id, response.entry);
+              const payload = await decryptEntryPayload(
+                vaultKey,
+                accountId,
+                response.entry,
+              );
+              if (sessionEpoch !== sessionEpochRef.current) return;
+              setEntries((current) => [
+                {
+                  id: response.entry.id,
+                  payload,
+                  createdAt: response.entry.clientCreatedAt,
+                  updatedAt: response.entry.clientUpdatedAt,
+                  ...(response.entry.completedAt === undefined
+                    ? {}
+                    : { completedAt: response.entry.completedAt }),
+                  ...(response.entry.localDay === undefined
+                    ? {}
+                    : { localDay: response.entry.localDay }),
+                },
+                ...current.filter((entry) => entry.id !== response.entry.id),
+              ]);
+              const alreadyGrew = growthEventsRef.current.some(
+                (event) =>
+                  event.entryId === response.entry.id &&
+                  event.kind.startsWith("memory_"),
+              );
+              const unseenGrowth = appendUnseenGrowthEvents(response.events);
+              if (unseenGrowth.length > 0 && !alreadyGrew) {
+                enqueueGrowthReveal(
+                  unseenGrowth,
+                  response.entry.id,
+                  payload.seedInsight,
+                );
+                navigate({ name: "home" });
+              }
+            }
+          });
+
+          if (sessionEpoch !== sessionEpochRef.current) return;
+          const entryId =
+            operation.kind === "delete"
+              ? operation.entryId
+              : operation.envelope.id;
+          await removeEncryptedOperation(operation.operationId);
+          await removeEncryptedDraft(accountId, entryId);
+          setEnvelopes(Array.from(envelopeRef.current.values()));
+        } catch (caught) {
+          failed = true;
+          const status = getSyncStatusForFailure(caught);
+          setSyncState(status.state);
+          setSyncMessage(status.message);
+          break;
+        }
+      }
+
+      if (!failed && sessionEpoch === sessionEpochRef.current) {
+        setSyncState("idle");
+        setSyncMessage(undefined);
+      }
+    })();
+
+    const settled = task.finally(() => {
+      if (flushInFlightRef.current === settled) {
+        flushInFlightRef.current = null;
+      }
+    });
+    flushInFlightRef.current = settled;
+    return settled;
   }, [
     appendUnseenGrowthEvents,
-    bootstrap,
     enqueueGrowthReveal,
     mutate,
     navigate,
@@ -732,10 +950,19 @@ export function SeedJournalApp({
 
   useEffect(() => {
     if (!bootstrap || !vaultKey || loadingMessage) return;
+    const markOffline = () => {
+      setSyncState("offline");
+      setSyncMessage("Offline. Changes will sync when you reconnect.");
+    };
     const flush = () => void flushEncryptedOutbox();
+    window.addEventListener("offline", markOffline);
     window.addEventListener("online", flush);
     if (navigator.onLine) flush();
-    return () => window.removeEventListener("online", flush);
+    else markOffline();
+    return () => {
+      window.removeEventListener("offline", markOffline);
+      window.removeEventListener("online", flush);
+    };
   }, [bootstrap, flushEncryptedOutbox, loadingMessage, vaultKey]);
 
   useEffect(() => {
@@ -745,11 +972,25 @@ export function SeedJournalApp({
     let timer = window.setTimeout(lockIfInactive, inactivityLimit);
 
     function lockJournal() {
-      setVaultKey(null);
-      setEntries([]);
-      setSelectedEntryId(null);
-      setGrowthRevealQueue([]);
-      navigate({ name: "home" });
+      const token = bootstrapRef.current?.csrfToken;
+      void (async () => {
+        if (token) {
+          try {
+            await fetch("/api/auth/logout", {
+              method: "POST",
+              credentials: "same-origin",
+              headers: {
+                "Content-Type": "application/json",
+                "x-seedjournal-csrf": token,
+              },
+              body: JSON.stringify({}),
+            });
+          } catch {
+            // The garden still locks if the network is gone.
+          }
+        }
+        clearPlaintextSession("timeout");
+      })();
     }
 
     function lockIfInactive() {
@@ -783,17 +1024,21 @@ export function SeedJournalApp({
       );
       document.removeEventListener("visibilitychange", checkVisibility);
     };
-  }, [navigate, vaultKey]);
+  }, [clearPlaintextSession, vaultKey]);
 
   const updateCompletedEntryNow = useCallback(
     async (entryId: string, payload: JournalEntryPayloadV1) => {
       if (!bootstrap || !vaultKey) return;
+      const sessionEpoch = sessionEpochRef.current;
+      const accountId = bootstrap.account.id;
+      const isCurrentSession = () =>
+        sessionEpoch === sessionEpochRef.current;
       const existing = envelopeRef.current.get(entryId);
       if (!existing?.completedAt || !existing.localDay) return;
       const now = Date.now();
       const envelope = await encryptEntryPayload(
         vaultKey,
-        bootstrap.account.id,
+        accountId,
         payload,
         {
           id: entryId,
@@ -805,10 +1050,12 @@ export function SeedJournalApp({
           localDay: existing.localDay,
         },
       );
-      await putEncryptedDraft(bootstrap.account.id, envelope);
+      if (!isCurrentSession()) return;
+      await putEncryptedDraft(accountId, envelope);
+      if (!isCurrentSession()) return;
 
       let storedEnvelope: EncryptedEntryEnvelope;
-      if (!bootstrap.csrfToken) {
+      if (!bootstrapRef.current?.csrfToken) {
         storedEnvelope = envelope;
       } else {
         try {
@@ -818,21 +1065,26 @@ export function SeedJournalApp({
             { expectedRevision: existing.revision, envelope },
           );
           storedEnvelope = response.entry;
-          await removeEncryptedDraft(bootstrap.account.id, entryId);
+          await removeEncryptedDraft(accountId, entryId);
         } catch (caught) {
           if (!isNetworkFailure(caught)) throw caught;
+          if (!isCurrentSession()) return;
           await enqueueEncryptedOperation({
-            operationId: `update:${bootstrap.account.id}:${entryId}:${envelope.revision}`,
-            accountId: bootstrap.account.id,
+            operationId: `update:${accountId}:${entryId}:${envelope.revision}`,
+            accountId,
             createdAt: now,
             kind: "update",
             expectedRevision: existing.revision,
             envelope,
           });
+          const status = getSyncStatusForFailure(caught);
+          setSyncState(status.state);
+          setSyncMessage(status.message);
           storedEnvelope = envelope;
         }
       }
 
+      if (!isCurrentSession()) return;
       envelopeRef.current.set(entryId, storedEnvelope);
       setEnvelopes(Array.from(envelopeRef.current.values()));
       setEntries((current) =>
@@ -858,21 +1110,141 @@ export function SeedJournalApp({
     [runEntryMutation, updateCompletedEntryNow],
   );
 
-  const deleteEntry = async (entryId: string) => {
-    const existing = envelopeRef.current.get(entryId);
-    if (!existing) return;
-    await mutate(`/api/entries/${entryId}`, "DELETE", {
-      expectedRevision: existing.revision,
-    });
+  const applyLocalDeletion = useCallback((entryId: string) => {
     envelopeRef.current.delete(entryId);
     setEnvelopes(Array.from(envelopeRef.current.values()));
     setEntries((current) => current.filter((entry) => entry.id !== entryId));
     const anonymizedGrowth = growthEventsRef.current.map((event) =>
-        event.entryId === entryId ? { ...event, entryId: null } : event,
+      event.entryId === entryId ? { ...event, entryId: null } : event,
     );
     growthEventsRef.current = anonymizedGrowth;
     setGrowthEvents(anonymizedGrowth);
-  };
+  }, []);
+
+  const deleteEntry = useCallback(
+    (entryId: string) =>
+      runEntryMutation(entryId, async () => {
+        if (!bootstrap) return;
+        const sessionEpoch = sessionEpochRef.current;
+        const accountId = bootstrap.account.id;
+        const isCurrentSession = () =>
+          sessionEpoch === sessionEpochRef.current;
+        const existing = envelopeRef.current.get(entryId);
+        if (!existing) return;
+        const expectedRevision = existing.revision;
+
+        try {
+          await mutate(`/api/entries/${entryId}`, "DELETE", {
+            expectedRevision,
+          });
+        } catch (caught) {
+          if (!isNetworkFailure(caught)) throw caught;
+          if (!isCurrentSession()) return;
+          await enqueueEncryptedOperation({
+            operationId: `delete:${accountId}:${entryId}:${expectedRevision}`,
+            accountId,
+            createdAt: Date.now(),
+            kind: "delete",
+            entryId,
+            expectedRevision,
+          });
+          await removeEncryptedDraft(accountId, entryId);
+          if (!isCurrentSession()) return;
+          applyLocalDeletion(entryId);
+          const status = getSyncStatusForFailure(caught);
+          setSyncState(status.state);
+          setSyncMessage(status.message);
+          return;
+        }
+
+        if (!isCurrentSession()) return;
+        await removeEncryptedDraft(accountId, entryId);
+        if (!isCurrentSession()) return;
+        applyLocalDeletion(entryId);
+      }),
+    [applyLocalDeletion, bootstrap, mutate, runEntryMutation],
+  );
+
+  const deleteAccount = useCallback(async () => {
+    const session = bootstrapRef.current;
+    if (!session) return;
+    const accountId = session.account.id;
+    await mutate("/api/account", "DELETE", { confirmation: "DELETE" });
+    clearPlaintextSession("account-delete");
+    try {
+      await clearEncryptedLocalData(accountId);
+    } catch (caught) {
+      setLocalCleanupFailure({
+        accountId,
+        message:
+          caught instanceof Error
+            ? caught.message
+            : "Encrypted local cleanup could not be completed.",
+      });
+      return;
+    }
+    window.location.replace("/welcome");
+  }, [clearPlaintextSession, mutate]);
+
+  const retryLocalCleanup = useCallback(async () => {
+    if (!localCleanupFailure) return;
+    const failure = localCleanupFailure;
+    setLocalCleanupFailure({
+      ...failure,
+      message: "Retrying encrypted local cleanup…",
+    });
+    try {
+      await clearEncryptedLocalData(failure.accountId);
+    } catch (caught) {
+      setLocalCleanupFailure({
+        ...failure,
+        message:
+          caught instanceof Error
+            ? caught.message
+            : "Encrypted local cleanup could not be completed.",
+      });
+      return;
+    }
+    window.location.replace("/welcome");
+  }, [localCleanupFailure]);
+
+  const signOut = useCallback(async () => {
+    try {
+      if (bootstrapRef.current?.csrfToken) {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "x-seedjournal-csrf": bootstrapRef.current.csrfToken,
+          },
+          body: JSON.stringify({}),
+        });
+      }
+    } catch {
+      // Cookie clear on the server is best-effort; always leave the garden.
+    }
+    clearPlaintextSession("logout");
+  }, [clearPlaintextSession]);
+
+  const lockGarden = useCallback(async () => {
+    try {
+      if (bootstrapRef.current?.csrfToken) {
+        await fetch("/api/auth/logout", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: {
+            "Content-Type": "application/json",
+            "x-seedjournal-csrf": bootstrapRef.current.csrfToken,
+          },
+          body: JSON.stringify({}),
+        });
+      }
+    } catch {
+      // The garden still locks if the network is gone.
+    }
+    clearPlaintextSession("lock");
+  }, [clearPlaintextSession]);
 
   const displayedGrowthEvents = useMemo(
     () =>
@@ -905,10 +1277,12 @@ export function SeedJournalApp({
 
   const memories = useMemo<GardenMemoryRecord[]>(() => {
     const byId = new Map(entries.map((entry) => [entry.id, entry]));
+    let journalOrdinal = 0;
     return displayedGrowthEvents.flatMap((event) => {
       if (!event.entryId || !event.kind.startsWith("memory_")) return [];
       const entry = byId.get(event.entryId);
       if (!entry) return [];
+      journalOrdinal += 1;
       const form = event.kind.replace("memory_", "").replaceAll("_", "-") as
         | "leaf"
         | "bud"
@@ -921,33 +1295,52 @@ export function SeedJournalApp({
           dateLabel: new Intl.DateTimeFormat(undefined, {
             dateStyle: "medium",
           }).format(event.occurredAt),
+          localDay: entry.localDay,
           title: entry.payload.title || entry.payload.prompt.renderedText,
           seedInsight: entry.payload.seedInsight,
+          body: entry.payload.body,
           form,
+          journalOrdinal,
         },
       ];
     });
   }, [displayedGrowthEvents, entries]);
 
-  if (error) return <StatusScreen title="The garden is resting" detail={error} />;
-  if (!bootstrap || vault === undefined) {
-    return <StatusScreen title="Seed Journal" detail={loadingMessage} busy />;
-  }
-  if (vault === null) {
+  const pendingGrowthReveal = growthRevealQueue[0] ?? null;
+  useEffect(() => {
+    setCeremonyComplete(false);
+  }, [pendingGrowthReveal?.entryId, pendingGrowthReveal?.delta.nextSequence]);
+
+  if (localCleanupFailure) {
     return (
-      <VaultScreen
-        mode="setup"
-        onSubmit={createPrivateVault}
-        detail="Create a private passphrase. It encrypts every reflection before it leaves this device."
+      <StatusScreen
+        title="Your journal was deleted"
+        detail={`The account is gone, but this device still needs to finish encrypted cleanup. ${localCleanupFailure.message}`}
+        action={() => void retryLocalCleanup()}
+        actionLabel="Retry cleanup"
       />
     );
   }
-  if (!vaultKey) {
+  if (error) {
     return (
-      <VaultScreen
-        mode="unlock"
-        onSubmit={unlockPrivateVault}
-        detail="Your journal is encrypted. Unlock it to return to your tree."
+      <StatusScreen
+        title="The garden is resting"
+        detail={error}
+        action={
+          authFailure
+            ? () => window.location.replace("/welcome")
+            : undefined
+        }
+        actionLabel={authFailure ? "Sign in again" : undefined}
+      />
+    );
+  }
+  if (!bootstrap || vault === undefined || !vaultKey || loadingMessage) {
+    return (
+      <StatusScreen
+        title="Seed Journal"
+        detail={loadingMessage || "Opening your garden…"}
+        busy
       />
     );
   }
@@ -957,16 +1350,15 @@ export function SeedJournalApp({
     setActiveEntryId(crypto.randomUUID());
     navigate({ name: "new", parentEntryId: entryId });
   };
-  const pendingGrowthReveal = growthRevealQueue[0] ?? null;
+  // Ceremony only after leaving the ritual route (single climax on home body).
+  const showGrowthReveal =
+    Boolean(pendingGrowthReveal) && route.name !== "new";
   const unfinishedReflection =
     entries.find(
       (entry) =>
         !entry.completedAt &&
         entry.payload.body.trim().length > 0,
     ) ?? null;
-  const gardenWeather = weatherForEntry(
-    entries.find((entry) => Boolean(entry.completedAt))?.payload,
-  );
   const todayLocalDay = localDay();
   const careRhythm = createCareRhythm(
     entries.flatMap((entry) =>
@@ -974,6 +1366,25 @@ export function SeedJournalApp({
     ),
     todayLocalDay,
   );
+  const latestCompleted = [...entries]
+    .filter((entry) => Boolean(entry.completedAt))
+    .sort(
+      (left, right) => (right.completedAt ?? 0) - (left.completedAt ?? 0),
+    )[0];
+  const fromWriting = weatherForEntry(latestCompleted?.payload);
+  const gardenWeather =
+    (route.name === "new" || showGrowthReveal) && draftWeather
+      ? draftWeather
+      :
+    latestCompleted &&
+    !careRhythm.tendedToday &&
+    fromWriting.kind === "still"
+      ? {
+          kind: "dew" as const,
+          label: "Morning dew",
+          description: "The garden is resting until you return.",
+        }
+      : fromWriting;
   const dueReturnBud = selectDueReturnBud(entries, todayLocalDay);
   const resolveReturnBud = async (
     entryId: string,
@@ -1005,9 +1416,24 @@ export function SeedJournalApp({
         }
       : undefined;
     routeContent = (
-      <main className="sj-route-surface" id="main-content">
+      <>
+        <TreeFirstHome
+          companionOpen
+          snapshot={snapshot}
+          memories={memories}
+          weather={gardenWeather}
+          careRhythm={careRhythm}
+          returnBud={dueReturnBud}
+          hasUnfinishedReflection={Boolean(unfinishedReflection)}
+          selectedEntryId={null}
+          onBeginJournal={() => undefined}
+          onOpenArchive={() => navigate({ name: "archive" })}
+          onOpenSettings={() => navigate({ name: "settings" })}
+          onLock={() => void lockGarden()}
+        />
         <JournalRitual
           key={activeEntryId}
+          layout="card"
           entryId={activeEntryId}
           restoredDraft={restoredDraft}
           localDay={todayLocalDay}
@@ -1023,13 +1449,35 @@ export function SeedJournalApp({
           )}
           onAutosave={autosaveActiveEntry}
           onComplete={completeActiveEntry}
-          onExit={() => navigate({ name: "home" })}
+          onAtmosphere={handleAtmosphere}
+          resumed={resumedEntryId === activeEntryId && Boolean(restoredEntry)}
+          onFresh={() => {
+            const leaving = activeEntryId;
+            suppressDraftResumeRef.current = true;
+            setResumedEntryId(null);
+            void removeEncryptedDraft(bootstrap.account.id, leaving);
+            envelopeRef.current.delete(leaving);
+            setEnvelopes(Array.from(envelopeRef.current.values()));
+            setEntries((current) =>
+              current.filter(
+                (entry) => entry.completedAt !== undefined || entry.id !== leaving,
+              ),
+            );
+            setActiveEntryId(crypto.randomUUID());
+          }}
+          onExit={() => {
+            window.clearTimeout(weatherTimerRef.current);
+            setDraftWeather(null);
+            navigate({ name: "home" });
+          }}
           onNurtured={() => {
+            window.clearTimeout(weatherTimerRef.current);
+            setResumedEntryId(null);
             setActiveEntryId(crypto.randomUUID());
             navigate({ name: "home" });
           }}
         />
-      </main>
+      </>
     );
   } else if (route.name === "archive") {
     routeContent = (
@@ -1050,17 +1498,25 @@ export function SeedJournalApp({
         <StatusScreen
           title="Memory unavailable"
           detail="This memory may have been removed."
-          action={() => navigate({ name: "archive" })}
-          actionLabel="Return to journal"
+          action={() => navigate({ name: "home" })}
+          actionLabel="Return to your sakura"
         />
       );
     } else {
       routeContent = (
         <EntryReader
           entry={entry}
-          onBack={() => navigate({ name: "archive" })}
+          onBack={() => {
+            // Petal → journal → garden continuum (archive remains available).
+            setSelectedEntryId(entry.id);
+            navigate({ name: "home" });
+          }}
           onSave={updateCompletedEntry}
-          onDelete={deleteEntry}
+          onDelete={async (entryId) => {
+            await deleteEntry(entryId);
+            setSelectedEntryId(null);
+            navigate({ name: "home" });
+          }}
           onRevisit={revisit}
         />
       );
@@ -1068,37 +1524,24 @@ export function SeedJournalApp({
   } else if (route.name === "settings") {
     routeContent = (
       <SettingsScreen
-        displayName={displayName}
-        vault={vault}
+        displayName={
+          bootstrap.account.displayName ||
+          bootstrap.account.email ||
+          displayName
+        }
+        vault={vault ?? sessionVaultStub(bootstrap)}
         envelopes={envelopes}
         entries={entries}
         growthEvents={growthEvents}
         rootSeed={snapshot.rootSeed}
         treeAlgorithmVersion={snapshot.algorithmVersion}
         onBack={() => navigate({ name: "home" })}
-        onLock={() => {
-          setVaultKey(null);
-          setEntries([]);
-          navigate({ name: "home" });
-        }}
-        onChangePassphrase={async (current, next) => {
-          const changed = await rewrapVault(vault, current, next);
-          const response = await mutate<{ vault: StoredVault }>(
-            "/api/vault",
-            "PUT",
-            { expectedRevision: vault.revision, vault: changed.metadata },
-          );
-          setVault(response.vault);
-          setVaultKey(changed.vaultKey);
-        }}
-        onDeleteAccount={async () => {
-          await mutate("/api/account", "DELETE", { confirmation: "DELETE" });
-          await clearEncryptedLocalData(bootstrap.account.id);
-          window.location.assign("/signout-with-chatgpt?return_to=%2Fwelcome");
-        }}
-      />
+        onDeleteAccount={deleteAccount}
+        onSignOut={() => void signOut()}
+       />
     );
-  } else if (pendingGrowthReveal) {
+  } else if (showGrowthReveal && pendingGrowthReveal) {
+    // Single climax: copy overlay on the home garden body (one Canvas).
     const totalGrowthUnits = snapshot.events.reduce(
       (total, event) => total + event.growthUnits,
       0,
@@ -1112,10 +1555,12 @@ export function SeedJournalApp({
           reducedMotion={reducedMotion}
           treeId={snapshot.treeId}
           snapshot={snapshot}
+          hostGarden
+          ceremonyComplete={ceremonyComplete}
           onReturn={() => {
             const remaining = growthRevealQueue.slice(1);
             setGrowthRevealQueue(remaining);
-            setSelectedEntryId(remaining[0]?.entryId ?? null);
+            setSelectedEntryId(null);
           }}
         />
       </main>
@@ -1132,10 +1577,25 @@ export function SeedJournalApp({
         selectedEntryId={selectedEntryId}
         onSelectEntry={setSelectedEntryId}
         onBeginJournal={() => {
-          setActiveEntryId(unfinishedReflection?.id ?? crypto.randomUUID());
+          const resumeId = unfinishedReflection?.id ?? null;
+          setResumedEntryId(resumeId);
+          setActiveEntryId(resumeId ?? crypto.randomUUID());
           navigate({ name: "new" });
         }}
         onStartFreshJournal={() => {
+          const leaving = unfinishedReflection?.id;
+          suppressDraftResumeRef.current = true;
+          setResumedEntryId(null);
+          if (leaving) {
+            void removeEncryptedDraft(bootstrap.account.id, leaving);
+            envelopeRef.current.delete(leaving);
+            setEnvelopes(Array.from(envelopeRef.current.values()));
+            setEntries((current) =>
+              current.filter(
+                (entry) => entry.completedAt !== undefined || entry.id !== leaving,
+              ),
+            );
+          }
           setActiveEntryId(crypto.randomUUID());
           navigate({ name: "new" });
         }}
@@ -1147,19 +1607,39 @@ export function SeedJournalApp({
         }
         onOpenArchive={() => navigate({ name: "archive" })}
         onOpenSettings={() => navigate({ name: "settings" })}
-        onLock={() => setVaultKey(null)}
-        onReadEntry={openEntry}
-        onRevisitEntry={revisit}
+        onLock={() => void lockGarden()}
+        onReadEntry={(entryId) => {
+          // Leave the petal viewer so home does not re-open it after reading.
+          setSelectedEntryId(null);
+          openEntry(entryId);
+        }}
+        onRevisitEntry={(entryId) => {
+          setSelectedEntryId(null);
+          revisit(entryId);
+        }}
       />
     );
   }
 
+  // Growth reveal keeps garden active on the same Canvas (revealMode).
   const gardenMode =
-    route.name === "home"
+    showGrowthReveal || route.name === "home" || route.name === "new"
       ? "active"
-      : route.name === "new"
-        ? "ambient"
-        : "paused";
+      : "paused";
+  const revealNewestUnits =
+    showGrowthReveal && pendingGrowthReveal
+      ? (() => {
+          const earned =
+            pendingGrowthReveal.delta.events.find((event) =>
+              event.kind.startsWith("memory_"),
+            ) ?? pendingGrowthReveal.delta.events.at(-1);
+          const units = earned?.growthUnits ?? 1;
+          if (units >= 6) return 6 as const;
+          if (units >= 4) return 4 as const;
+          if (units >= 2) return 2 as const;
+          return 1 as const;
+        })()
+      : undefined;
 
   return (
     <AppFrame
@@ -1168,102 +1648,47 @@ export function SeedJournalApp({
       weather={gardenWeather}
       tendedToday={careRhythm.tendedToday}
       returnBudEntryId={
-        route.name === "home" ? dueReturnBud?.entryId : undefined
+        route.name === "home" && !showGrowthReveal
+          ? dueReturnBud?.entryId
+          : undefined
       }
-      growthDelta={
-        route.name === "home" ? pendingGrowthReveal?.delta : undefined
+      growthDelta={showGrowthReveal ? pendingGrowthReveal?.delta : undefined}
+      selectedEntryId={
+        showGrowthReveal
+          ? pendingGrowthReveal?.entryId ?? selectedEntryId
+          : route.name === "new"
+            ? null
+            : selectedEntryId
       }
-      selectedEntryId={selectedEntryId}
-      onSelectEntry={setSelectedEntryId}
+      onSelectEntry={route.name === "new" ? undefined : setSelectedEntryId}
+      revealMode={showGrowthReveal}
+      newestGrowthUnits={revealNewestUnits}
+      reducedMotion={reducedMotion}
+      onCeremonyComplete={() => setCeremonyComplete(true)}
+      aboveCard={route.name === "new" && !showGrowthReveal}
     >
+      <SyncStatus
+        state={syncState}
+        message={syncMessage}
+        onRetry={() => void flushEncryptedOutbox()}
+      />
       {routeContent}
     </AppFrame>
   );
 }
 
-function VaultScreen({
-  mode,
-  detail,
-  onSubmit,
-}: {
-  mode: "setup" | "unlock";
-  detail: string;
-  onSubmit: (passphrase: string) => Promise<void>;
-}) {
-  const [passphrase, setPassphrase] = useState("");
-  const [confirmation, setConfirmation] = useState("");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string>();
-  const setup = mode === "setup";
-
-  return (
-    <main className="sj-vault-screen" id="main-content">
-      <div className="sj-vault-card">
-        <span className="sj-vault-card__mark" aria-hidden>
-          <LockKey weight="light" />
-        </span>
-        <p className="sj-eyebrow">A private place to grow</p>
-        <h1>{setup ? "Protect your journal" : "Welcome back"}</h1>
-        <p>{detail}</p>
-        <form
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (setup && passphrase !== confirmation) {
-              setError("The two passphrases do not match.");
-              return;
-            }
-            setPending(true);
-            setError(undefined);
-            void onSubmit(passphrase)
-              .catch((caught: unknown) =>
-                setError(
-                  caught instanceof Error
-                    ? caught.message
-                    : "The journal could not be unlocked.",
-                ),
-              )
-              .finally(() => setPending(false));
-          }}
-        >
-          <label>
-            Journal passphrase
-            <input
-              type="password"
-              minLength={12}
-              required
-              autoComplete={setup ? "new-password" : "current-password"}
-              value={passphrase}
-              onChange={(event) => setPassphrase(event.target.value)}
-            />
-          </label>
-          {setup ? (
-            <label>
-              Confirm passphrase
-              <input
-                type="password"
-                minLength={12}
-                required
-                autoComplete="new-password"
-                value={confirmation}
-                onChange={(event) => setConfirmation(event.target.value)}
-              />
-            </label>
-          ) : null}
-          {error ? <p className="sj-form-error">{error}</p> : null}
-          <button type="submit" disabled={pending}>
-            {pending
-              ? "Preparing your private garden…"
-              : setup
-                ? "Create private journal"
-                : "Unlock journal"}
-          </button>
-        </form>
-        <small>
-          Seed Journal cannot recover this passphrase. Store it somewhere safe.
-        </small>
-      </div>
-    </main>
-  );
+function sessionVaultStub(_bootstrap: BootstrapResponse): StoredVault {
+  return {
+    formatVersion: 1,
+    kdf: "PBKDF2-SHA-256",
+    iterations: 600_000,
+    salt: "AAAAAAAAAAAAAAAAAAAAAA==",
+    wrapAlgorithm: "AES-256-GCM",
+    wrapIv: "AAAAAAAAAAAAAAAA",
+    wrappedKey: "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    revision: 1,
+    updatedAt: Date.now(),
+  };
 }
 
 function SettingsScreen({
@@ -1275,9 +1700,8 @@ function SettingsScreen({
   rootSeed,
   treeAlgorithmVersion,
   onBack,
-  onLock,
-  onChangePassphrase,
   onDeleteAccount,
+  onSignOut,
 }: {
   displayName: string;
   vault: StoredVault;
@@ -1287,14 +1711,20 @@ function SettingsScreen({
   rootSeed: string;
   treeAlgorithmVersion: 1 | 2;
   onBack: () => void;
-  onLock: () => void;
-  onChangePassphrase: (current: string, next: string) => Promise<void>;
   onDeleteAccount: () => Promise<void>;
+  onSignOut: () => void;
 }) {
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const [message, setMessage] = useState<string>();
-  const [deleteText, setDeleteText] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmReadable, setConfirmReadable] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string>();
+  const [gentleCareNote, setGentleCareNote] = useState(false);
+
+  useEffect(() => {
+    void import("@/features/growth/careReminder").then((module) => {
+      setGentleCareNote(module.readGentleCareNoteEnabled());
+    });
+  }, []);
 
   const download = (blob: Blob, filename: string) => {
     const url = URL.createObjectURL(blob);
@@ -1314,17 +1744,42 @@ function SettingsScreen({
         <section>
           <h2>Privacy</h2>
           <p>
-            Your entry text is encrypted in this browser before it is stored.
+            Your words are encrypted on this device before they are stored.
+            A signed-in session can open them, because the wrapped key is kept
+            with the account. The server stores that ciphertext and knows that
+            an entry exists, and when. This is not a lock that even we cannot
+            open.
           </p>
-          <button className="sj-settings__button" type="button" onClick={onLock}>
-            <LockKey aria-hidden /> Lock journal
-          </button>
+          <Link className="sj-settings__button" href="/privacy">
+            Read how the garden keeps a journal
+          </Link>
+        </section>
+        <section>
+          <h2>Care note</h2>
+          <p>
+            A soft line on home when today is still open. Never a push
+            notification, never a streak to protect.
+          </p>
+          <label className="sj-settings__toggle">
+            <input
+              type="checkbox"
+              checked={gentleCareNote}
+              onChange={(event) => {
+                const enabled = event.target.checked;
+                setGentleCareNote(enabled);
+                void import("@/features/growth/careReminder").then((module) => {
+                  module.writeGentleCareNoteEnabled(enabled);
+                });
+              }}
+            />
+            <span>Show a gentle care note on home</span>
+          </label>
         </section>
         <section>
           <h2>Keep a copy</h2>
           <div className="sj-settings__actions">
             <button
-              className="sj-settings__button"
+              className="sj-settings__choice"
               type="button"
               onClick={() =>
                 download(
@@ -1341,95 +1796,155 @@ function SettingsScreen({
                 )
               }
             >
-              <DownloadSimple aria-hidden /> Encrypted archive
+              <DownloadSimple aria-hidden />
+              <span>
+                <strong>Encrypted backup</strong>
+                <small>For safekeeping. This garden cannot open it again.</small>
+              </span>
             </button>
             <button
-              className="sj-settings__button"
+              className="sj-settings__choice"
               type="button"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "This download will be readable and unencrypted. Continue?",
-                  )
-                ) {
-                  download(
-                    buildReadableMarkdown(
-                      entries.map((entry) => ({
-                        payload: entry.payload,
-                        completedAt: entry.completedAt,
-                      })),
-                    ),
-                    "seed-journal.md",
-                  );
-                }
-              }}
+              aria-expanded={confirmReadable}
+              onClick={() => setConfirmReadable(true)}
             >
-              <DownloadSimple aria-hidden /> Readable Markdown
+              <DownloadSimple aria-hidden />
+              <span>
+                <strong>Readable pages</strong>
+                <small>Anyone who receives this file can read every word.</small>
+              </span>
             </button>
           </div>
-        </section>
-        <section>
-          <h2>Change passphrase</h2>
-          <div className="sj-settings__fields">
-            <input
-              type="password"
-              value={current}
-              onChange={(event) => setCurrent(event.target.value)}
-              placeholder="Current passphrase"
-              aria-label="Current passphrase"
-            />
-            <input
-              type="password"
-              minLength={12}
-              value={next}
-              onChange={(event) => setNext(event.target.value)}
-              placeholder="New passphrase"
-              aria-label="New passphrase"
-            />
-            <button
-              className="sj-settings__button"
-              type="button"
-              onClick={() =>
-                void onChangePassphrase(current, next)
-                  .then(() => {
-                    setCurrent("");
-                    setNext("");
-                    setMessage("Passphrase changed.");
-                  })
-                  .catch(() => setMessage("The passphrase could not be changed."))
-              }
-            >
-              <Key aria-hidden /> Update passphrase
-            </button>
-          </div>
-          {message ? <p aria-live="polite">{message}</p> : null}
+          {confirmReadable ? (
+            <div className="sj-settings__confirm" role="group" aria-label="Download readable pages">
+              <p>
+                This file is plain text. It is not encrypted. Keep it only
+                where you would keep a paper journal.
+              </p>
+              <div className="sj-settings__confirm-actions">
+                <button
+                  className="sj-settings__button"
+                  type="button"
+                  onClick={() => {
+                    download(
+                      buildReadableMarkdown(
+                        entries.map((entry) => ({
+                          payload: entry.payload,
+                          completedAt: entry.completedAt,
+                        })),
+                      ),
+                      "seed-journal.md",
+                    );
+                    setConfirmReadable(false);
+                  }}
+                >
+                  Download the readable copy
+                </button>
+                <button
+                  className="sj-settings__quiet"
+                  type="button"
+                  onClick={() => setConfirmReadable(false)}
+                >
+                  Keep it here
+                </button>
+              </div>
+            </div>
+          ) : null}
         </section>
         <section className="sj-settings__danger">
           <h2>Delete journal</h2>
           <p>
-            This removes active entries and tree data. Export first if you want
-            to keep a copy.
+            This removes the entries, the tree, and the account from this
+            garden, including the copy kept on this device. Take a backup
+            first if you want the words to survive.
           </p>
-          <input
-            value={deleteText}
-            onChange={(event) => setDeleteText(event.target.value)}
-            placeholder="Type DELETE"
-            aria-label="Type DELETE to confirm"
-          />
-          <button
-            className="sj-settings__button sj-settings__button--danger"
-            type="button"
-            disabled={deleteText !== "DELETE"}
-            onClick={() => void onDeleteAccount()}
-          >
-            <Trash aria-hidden /> Delete my journal
-          </button>
+          {confirmDelete ? (
+            <div className="sj-settings__confirm" role="group" aria-label="Confirm deletion">
+              <p>The garden cannot bring this journal back.</p>
+              <div className="sj-settings__confirm-actions">
+                <button
+                  className="sj-settings__button sj-settings__button--danger"
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => {
+                    setDeleting(true);
+                    setDeleteError(undefined);
+                    void onDeleteAccount().catch(() => {
+                      setDeleting(false);
+                      setDeleteError(
+                        "The journal is still here. Nothing was removed.",
+                      );
+                    });
+                  }}
+                >
+                  <Trash aria-hidden /> Remove the journal
+                </button>
+                <button
+                  className="sj-settings__quiet"
+                  type="button"
+                  disabled={deleting}
+                  onClick={() => {
+                    setDeleteError(undefined);
+                    setConfirmDelete(false);
+                  }}
+                >
+                  Keep it
+                </button>
+              </div>
+              {deleteError ? (
+                <p role="alert">{deleteError}</p>
+              ) : null}
+            </div>
+          ) : (
+            <button
+              className="sj-settings__button sj-settings__button--danger"
+              type="button"
+              onClick={() => {
+                setDeleteError(undefined);
+                setConfirmDelete(true);
+              }}
+            >
+              <Trash aria-hidden /> Delete my journal
+            </button>
+          )}
         </section>
-        <a className="sj-settings__signout" href="/signout-with-chatgpt?return_to=%2Fwelcome">
+        <button
+          className="sj-settings__signout"
+          type="button"
+          onClick={onSignOut}
+        >
           <SignOut aria-hidden /> Sign out
-        </a>
+        </button>
       </main>
     </>
+  );
+}
+
+function SyncStatus({
+  state,
+  message,
+  onRetry,
+}: {
+  state: SyncState;
+  message?: string;
+  onRetry: () => void;
+}) {
+  if (state === "idle") return null;
+  return (
+    <div
+      className="sj-sync-status"
+      data-state={state}
+      role={state === "error" ? "alert" : "status"}
+      aria-live={state === "error" ? "assertive" : "polite"}
+      aria-atomic="true"
+    >
+      <span>{message ?? "Sync status updated."}</span>
+      {state === "error" ? (
+        <button type="button" onClick={onRetry}>
+          Try again
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -1447,11 +1962,21 @@ function StatusScreen({
   actionLabel?: string;
 }) {
   return (
-    <main className="sj-status-screen" id="main-content">
+    <main
+      className="sj-status-screen"
+      id="main-content"
+      aria-busy={busy || undefined}
+    >
       <div>
         <span className={busy ? "sj-status-orb sj-status-orb--busy" : "sj-status-orb"} />
         <h1>{title}</h1>
-        <p>{detail}</p>
+        <p
+          role={busy ? "status" : "alert"}
+          aria-live={busy ? "polite" : "assertive"}
+          aria-atomic="true"
+        >
+          {detail}
+        </p>
         {action ? (
           <button type="button" onClick={action}>
             <ArrowLeft aria-hidden /> {actionLabel}
@@ -1467,9 +1992,21 @@ class ApiClientError extends Error {
     readonly status: number,
     readonly code: string,
     message: string,
+    readonly requestId?: string,
   ) {
     super(message);
     this.name = "ApiClientError";
+  }
+
+  get retryable(): boolean {
+    return RETRYABLE_HTTP_STATUSES.has(this.status);
+  }
+}
+
+class RequestTimeoutError extends Error {
+  constructor() {
+    super("The request timed out.");
+    this.name = "RequestTimeoutError";
   }
 }
 
@@ -1492,27 +2029,124 @@ async function createCompletionEnvelope(
   });
 }
 
-async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(url, {
-    credentials: "same-origin",
-    cache: "no-store",
-    ...init,
-  });
-  const body = (await response.json()) as
-    | T
-    | { error?: { code?: string; message?: string } };
-  if (!response.ok) {
-    const apiError =
-      "error" in (body as object)
-        ? (body as { error?: { code?: string; message?: string } }).error
-        : undefined;
-    throw new ApiClientError(
-      response.status,
-      apiError?.code ?? "request_failed",
-      apiError?.message ?? "The request could not be completed.",
-    );
+async function adoptPendingTreeSeed(
+  session: BootstrapResponse,
+): Promise<BootstrapResponse> {
+  const pending = readPendingTreeSeed();
+  if (!pending) return session;
+  if (pending === session.account.treeSeed) {
+    clearPendingTreeSeed();
+    return session;
   }
-  return body as T;
+  if (session.journal.entryCount > 0) {
+    clearPendingTreeSeed();
+    return session;
+  }
+
+  const patchAccountSeed = (csrfToken: string) =>
+    fetchJson<{ treeSeed: string }>("/api/account", {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        "x-seedjournal-csrf": csrfToken,
+      },
+      body: JSON.stringify({ treeSeed: pending }),
+    });
+
+  try {
+    let current = session;
+    let result: { treeSeed: string };
+    try {
+      result = await patchAccountSeed(current.csrfToken);
+    } catch (caught) {
+      if (!isExpiredCsrf(caught)) throw caught;
+      current = await fetchJson<BootstrapResponse>("/api/bootstrap");
+      if (
+        pending === current.account.treeSeed ||
+        current.journal.entryCount > 0
+      ) {
+        clearPendingTreeSeed();
+        return current;
+      }
+      result = await patchAccountSeed(current.csrfToken);
+    }
+    clearPendingTreeSeed();
+    return {
+      ...current,
+      account: { ...current.account, treeSeed: result.treeSeed },
+    };
+  } catch (caught) {
+    if (isAuthenticationFailure(caught)) throw caught;
+    if (
+      caught instanceof ApiClientError &&
+      (caught.status === 409 || caught.code === "invalid_tree_seed")
+    ) {
+      clearPendingTreeSeed();
+    }
+    return session;
+  }
+}
+
+async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? "GET").toUpperCase();
+  const maxAttempts = method === "GET" || method === "HEAD" ? 3 : 1;
+  const externalSignal = init?.signal;
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const controller = new AbortController();
+    let timedOut = false;
+    const timeout = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, REQUEST_TIMEOUT_MS);
+    const abortFromCaller = () => controller.abort(externalSignal?.reason);
+    externalSignal?.addEventListener("abort", abortFromCaller, { once: true });
+
+    try {
+      const response = await fetch(url, {
+        credentials: "same-origin",
+        cache: "no-store",
+        ...init,
+        signal: controller.signal,
+      });
+      const rawBody = await response.text();
+      const body = parseJsonResponse(rawBody);
+      if (!response.ok) {
+        const apiError = getApiErrorBody(body);
+        throw new ApiClientError(
+          response.status,
+          apiError?.code ?? "request_failed",
+          apiError?.message ?? "The request could not be completed.",
+          getRequestId(body) ?? response.headers.get("X-Request-ID") ?? undefined,
+        );
+      }
+      if (rawBody.trim() === "") return undefined as T;
+      if (body === undefined) {
+        throw new ApiClientError(
+          response.status,
+          "invalid_response",
+          "The server returned an invalid response.",
+        );
+      }
+      return body as T;
+    } catch (caught) {
+      lastError = timedOut ? new RequestTimeoutError() : caught;
+      if (
+        attempt + 1 >= maxAttempts ||
+        externalSignal?.aborted ||
+        !isNetworkFailure(lastError)
+      ) {
+        throw lastError;
+      }
+      await delay(150 * 2 ** attempt);
+    } finally {
+      clearTimeout(timeout);
+      externalSignal?.removeEventListener("abort", abortFromCaller);
+    }
+  }
+
+  throw lastError ?? new Error("The request could not be completed.");
 }
 
 function isRevisionConflict(caught: unknown): boolean {
@@ -1527,9 +2161,109 @@ function isRevisionConflict(caught: unknown): boolean {
 function isNetworkFailure(caught: unknown): boolean {
   return (
     (typeof navigator !== "undefined" && !navigator.onLine) ||
-    caught instanceof TypeError
+    caught instanceof TypeError ||
+    caught instanceof RequestTimeoutError ||
+    (caught instanceof ApiClientError && caught.retryable) ||
+    (caught instanceof Error && caught.name === "AbortError")
   );
 }
+
+function isAuthenticationFailure(caught: unknown): boolean {
+  return caught instanceof ApiClientError && caught.status === 401;
+}
+
+function isExpiredCsrf(caught: unknown): boolean {
+  return (
+    caught instanceof ApiClientError &&
+    caught.status === 403 &&
+    caught.code === "invalid_csrf"
+  );
+}
+
+function getSyncStatusForFailure(caught: unknown): {
+  state: Exclude<SyncState, "idle" | "syncing">;
+  message: string;
+} {
+  if (typeof navigator !== "undefined" && !navigator.onLine) {
+    return {
+      state: "offline",
+      message: "Offline. Changes will sync when you reconnect.",
+    };
+  }
+  if (
+    caught instanceof RequestTimeoutError ||
+    (caught instanceof Error && caught.name === "AbortError")
+  ) {
+    return {
+      state: "error",
+      message: "Sync is taking longer than expected. We’ll try again.",
+    };
+  }
+  return {
+    state: "error",
+    message: "Some changes are waiting to sync. Try again.",
+  };
+}
+
+async function retryWithBackoff<T>(
+  task: () => Promise<T>,
+  maxAttempts = 3,
+): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    try {
+      return await task();
+    } catch (caught) {
+      lastError = caught;
+      if (
+        attempt + 1 >= maxAttempts ||
+        !isNetworkFailure(caught) ||
+        (typeof navigator !== "undefined" && !navigator.onLine)
+      ) {
+        throw caught;
+      }
+      await delay(250 * 2 ** attempt);
+    }
+  }
+  throw lastError ?? new Error("The operation could not be completed.");
+}
+
+function parseJsonResponse(rawBody: string): unknown {
+  if (rawBody.trim() === "") return undefined;
+  try {
+    return JSON.parse(rawBody) as unknown;
+  } catch {
+    return undefined;
+  }
+}
+
+function getApiErrorBody(
+  body: unknown,
+): { code?: string; message?: string } | undefined {
+  if (!isRecord(body) || !isRecord(body.error)) return undefined;
+  return {
+    code: typeof body.error.code === "string" ? body.error.code : undefined,
+    message:
+      typeof body.error.message === "string" ? body.error.message : undefined,
+  };
+}
+
+function getRequestId(body: unknown): string | undefined {
+  return isRecord(body) && typeof body.requestId === "string"
+    ? body.requestId
+    : undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function delay(milliseconds: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+const REQUEST_TIMEOUT_MS = 10_000;
+const RETRYABLE_HTTP_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
 function inferRitualStage(
   payload: JournalEntryPayloadV1,

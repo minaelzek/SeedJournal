@@ -233,7 +233,7 @@ async function deriveWrappingKey(
   }
 }
 
-function importVaultKey(rawKey: Uint8Array): Promise<CryptoKey> {
+export function importVaultKey(rawKey: Uint8Array): Promise<CryptoKey> {
   return crypto.subtle.importKey(
     "raw",
     copyArrayBuffer(rawKey),
@@ -241,4 +241,18 @@ function importVaultKey(rawKey: Uint8Array): Promise<CryptoKey> {
     false,
     ["encrypt", "decrypt"],
   );
+}
+
+export async function importVaultKeyFromBase64(
+  value: string,
+): Promise<CryptoKey> {
+  const rawKey = base64ToBytes(value);
+  try {
+    if (rawKey.byteLength !== 32) {
+      throw new Error("Invalid vault key.");
+    }
+    return await importVaultKey(rawKey);
+  } finally {
+    wipeBytes(rawKey);
+  }
 }

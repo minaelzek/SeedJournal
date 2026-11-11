@@ -8,6 +8,7 @@ import {
   growthCelebration,
   growthFormFromKind,
   growthFormLabel,
+  growthRevealCeremonySeconds,
   growthRevealKey,
   hasPresentedGrowthReveal,
   isExactGrowthDelta,
@@ -130,8 +131,13 @@ describe("seed-to-sakura growth experience", () => {
     );
     expect(markup).toContain("Return to your sakura");
     expect(markup).toContain("sj-growth-reveal");
-    expect(markup).toContain("sj-illustrated-sakura");
+    // Living Sakura body (not IllustratedSakura SVG) hosts the ceremony.
+    expect(markup).toContain("data-living-reveal");
+    expect(markup).toContain("data-living-sakura-reveal");
+    expect(markup).toContain('data-ceremony-seconds="4.2"');
+    expect(markup).not.toContain("sj-illustrated-sakura");
     expect(markup).toContain("sj-growth-reveal__copy");
+    expect(growthRevealCeremonySeconds).toBe(4.2);
     expect(markup).not.toMatch(
       /\b(score|scored|depth|signal|rubric|quality|grade|unit|points?|luminous)\b/i,
     );
@@ -155,8 +161,12 @@ describe("seed-to-sakura growth experience", () => {
     const celebration = growthCelebration(committed, "young-tree", "micro");
     expect(selectEarnedGrowthEvent(committed)?.kind).toBe("memory_blossom");
     expect(celebration.form).toBe("blossom");
-    expect(celebration.formLabel).toBe("A sakura blossom opened");
-    expect(celebration.detail).toMatch(/new branch/i);
+    expect(celebration.formLabel).toBe(
+      "Nearby, quiet life gathered beside the memory",
+    );
+    // Equal beauty: no structural grade claims from server twig/branch events.
+    expect(celebration.detail).not.toMatch(/\b(score|grade|points?)\b/i);
+    expect(celebration.title).toContain("A bud opened");
     expect(celebration.returnLabel).toBe("Return to your sakura");
 
     const markup = renderToStaticMarkup(
@@ -169,7 +179,7 @@ describe("seed-to-sakura growth experience", () => {
       />,
     );
 
-    expect(markup).toContain("A sakura blossom opened");
+    expect(markup).toContain("A bud opened on your sakura.");
     expect(markup).toContain("Return to your sakura");
     expect(markup).not.toContain("A new leaf unfurled");
   });
@@ -179,11 +189,16 @@ describe("seed-to-sakura growth experience", () => {
     expect(growthFormFromKind("memory_bud")).toBe("bud");
     expect(growthFormFromKind("memory_blossom")).toBe("blossom");
     expect(growthFormFromKind("memory_luminous_blossom")).toBe("luminous");
-    expect(growthFormLabel("bud")).toBe("A new sakura bud formed");
-    expect(growthFormLabel("luminous")).toBe("A radiant sakura blossom opened");
+    expect(growthFormLabel("bud")).toBe(
+      "Nearby, quiet life gathered beside the memory",
+    );
+    expect(growthFormLabel("luminous")).toBe(
+      "Nearby, quiet life gathered beside the memory",
+    );
 
     const celebration = growthCelebration(delta(8), "sapling", "micro");
-    expect(celebration.title).toBe(stageGrowthMessage("sapling").title);
+    // Equal beauty: memory petal leads; stage copy may still appear in detail.
+    expect(celebration.title).toContain("A bud opened");
     expect(
       `${celebration.formLabel} ${celebration.title} ${celebration.detail}`,
     ).not.toMatch(/\b(xp|points?|score|leaderboard|gems?)\b/i);

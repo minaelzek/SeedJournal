@@ -1,3 +1,47 @@
+.sj-sync-status {
+  position: fixed;
+  z-index: 30;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  display: flex;
+  max-width: min(28rem, calc(100vw - 2rem));
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.65rem 0.8rem 0.65rem 0.95rem;
+  border: 1px solid color-mix(in srgb, var(--sj-color-border) 88%, transparent);
+  border-radius: 999px;
+  color: var(--sj-color-text);
+  background: color-mix(in srgb, var(--sj-color-surface) 94%, transparent);
+  box-shadow: 0 0.75rem 2rem rgb(32 26 51 / 12%);
+  backdrop-filter: blur(0.85rem);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.sj-sync-status[data-state="offline"],
+.sj-sync-status[data-state="error"] {
+  border-color: color-mix(in srgb, var(--color-destructive) 30%, var(--sj-color-border));
+}
+
+.sj-app-frame__content:has(.sj-converse) .sj-sync-status {
+  top: max(4.25rem, calc(env(safe-area-inset-top) + 3.25rem));
+  bottom: auto;
+  pointer-events: auto;
+}
+
+.sj-sync-status button {
+  flex: 0 0 auto;
+  min-height: 2rem;
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--sj-color-border);
+  border-radius: 999px;
+  color: var(--sj-color-text);
+  background: var(--sj-color-surface);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .sj-route-surface {
   position: relative;
   z-index: 2;
@@ -25,7 +69,7 @@
 }
 
 .sj-growth-reveal-surface > section {
-  min-height: min(27rem, 52dvh) !important;
+  min-height: min(34rem, 72dvh) !important;
   justify-content: flex-end;
   pointer-events: auto;
 }
@@ -111,6 +155,38 @@
 
 .sj-vault-card form,
 .sj-vault-card label,
+.sj-settings__toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  margin-top: 0.85rem;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  cursor: pointer;
+}
+
+.sj-settings__toggle {
+  width: fit-content;
+}
+
+.sj-settings__toggle input {
+  margin-top: 0.2rem;
+  width: 1.05rem;
+  height: 1.05rem;
+  min-height: 1.05rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0.2rem;
+  background: transparent;
+  box-shadow: none;
+  accent-color: color-mix(in srgb, var(--sj-color-blossom) 70%, var(--sj-color-text));
+}
+
+.sj-settings__toggle input:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sj-color-blossom-shadow) 72%, transparent);
+  outline-offset: 3px;
+}
+
 .sj-settings__fields {
   display: grid;
   gap: 0.75rem;
@@ -127,7 +203,7 @@
 }
 
 .sj-vault-card input,
-.sj-settings input {
+.sj-settings input:not([type="checkbox"]) {
   min-height: 3.25rem;
   width: 100%;
   padding: 0 1rem;
@@ -140,7 +216,7 @@
 }
 
 .sj-vault-card input:focus,
-.sj-settings input:focus {
+.sj-settings input:not([type="checkbox"]):focus-visible {
   border-color: var(--color-focus);
   box-shadow: 0 0 0 3px rgb(255 214 230 / 12%);
 }
@@ -243,8 +319,11 @@
   letter-spacing: -0.02em;
 }
 
-.sj-settings section p {
-  color: var(--sj-color-text-muted);
+.sj-settings .sj-eyebrow,
+.sj-settings section p,
+.sj-settings__danger > p {
+  /* Paper is near-white. This ink clears WCAG AA at body size. */
+  color: #24302a !important;
   line-height: 1.6;
 }
 
@@ -271,14 +350,27 @@
   font-size: 0.875rem;
   font-weight: 560;
   transition:
+    transform var(--sj-motion-press, 100ms) var(--sj-ease-press, cubic-bezier(0.2, 0.9, 0.3, 1)),
     background var(--sj-motion-hover, 160ms) ease,
-    border-color var(--sj-motion-hover, 160ms) ease;
+    border-color var(--sj-motion-hover, 160ms) ease,
+    box-shadow var(--sj-motion-hover, 160ms) ease;
 }
 
 .sj-settings__button:hover,
 .sj-settings__signout:hover {
   border-color: color-mix(in srgb, var(--sj-color-leaf) 34%, var(--sj-color-border));
   background: color-mix(in srgb, var(--sj-color-surface) 94%, transparent);
+}
+
+.sj-settings__button:active:not(:disabled),
+.sj-settings__signout:active:not(:disabled) {
+  transform: scale(var(--sj-press-scale, 0.97));
+}
+
+.sj-settings__button:focus-visible,
+.sj-settings__signout:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sj-color-blossom-shadow) 72%, transparent);
+  outline-offset: 3px;
 }
 
 .sj-settings__button svg,
@@ -290,6 +382,82 @@
 .sj-settings__button:disabled {
   cursor: not-allowed;
   opacity: 0.4;
+}
+
+.sj-settings__choice {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--sj-color-border);
+  border-radius: 1rem;
+  color: var(--sj-color-text);
+  background: color-mix(in srgb, var(--sj-color-surface) 76%, transparent);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sj-settings__choice strong {
+  display: block;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.sj-settings__choice small {
+  display: block;
+  margin-top: 0.2rem;
+  color: #3d4a44;
+  font-size: 0.82rem;
+  line-height: 1.45;
+  font-weight: 450;
+}
+
+.sj-settings__choice:hover {
+  border-color: color-mix(in srgb, var(--sj-color-leaf) 34%, var(--sj-color-border));
+}
+
+.sj-settings__choice:focus-visible,
+.sj-settings__quiet:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--sj-color-blossom-shadow) 72%, transparent);
+  outline-offset: 3px;
+}
+
+.sj-settings__choice:active {
+  transform: scale(0.99);
+}
+
+.sj-settings__confirm {
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid color-mix(in srgb, var(--sj-color-border) 80%, transparent);
+}
+
+.sj-settings__confirm p {
+  margin: 0 0 0.75rem;
+}
+
+.sj-settings__confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem 1rem;
+  align-items: center;
+}
+
+.sj-settings__quiet {
+  min-height: 2.75rem;
+  padding: 0 0.4rem;
+  border: 0;
+  background: transparent;
+  color: #3d4a44;
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.sj-settings__actions {
+  flex-direction: column;
 }
 
 .sj-settings__danger {
@@ -319,5 +487,10 @@
 @media (max-width: 47.99rem) {
   .sj-route-surface {
     background: var(--color-surface);
+  }
+
+  /* Ritual sits in this surface; keep the garden visible through glass paper. */
+  .sj-route-surface:has(.sj-ritual) {
+    background: transparent;
   }
 }

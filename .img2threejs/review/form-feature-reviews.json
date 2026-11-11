@@ -1,0 +1,26 @@
+[
+  {
+    "id": "overall-silhouette",
+    "score": 0.55,
+    "visible": true,
+    "notes": "The widened five-arm scaffold reads as a real 3D tree, but the reference has a much fuller, lower, and more continuous blossom crown. Open gaps are preserved; canopy density is not yet matched."
+  },
+  {
+    "id": "primary-structure",
+    "score": 0.84,
+    "visible": true,
+    "notes": "Trunk, root flare, primary arms, secondary branches, and terminal twiglets are visible in front and orbit views."
+  },
+  {
+    "id": "blossom-system",
+    "score": 0.70,
+    "visible": true,
+    "notes": "Five-lobed low-poly blossom shells are readable in small terminal clusters, but the render is intentionally much sparser than the reference and several clusters sit visually detached because terminal twig placement still needs refinement."
+  },
+  {
+    "id": "emerging-leaves",
+    "score": 0.68,
+    "visible": true,
+    "notes": "Pointed copper-green leaf shells now read better than the prior plane cards, though their sparse distribution remains a deliberate approximation."
+  }
+]

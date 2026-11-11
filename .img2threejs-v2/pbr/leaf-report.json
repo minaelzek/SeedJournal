@@ -1,0 +1,89 @@
+{
+  "ok": true,
+  "verdict": "pass",
+  "confidence": 0.724,
+  "estimatedFidelity": 0.724,
+  "targetThreshold": 0.7,
+  "materialId": "leaf",
+  "sourceImage": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs-v2\\detail-crops\\zone-r0c0.png",
+  "outDir": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs-v2\\pbr\\leaf",
+  "palette": [
+    "#F1E4CF",
+    "#F3E8D3",
+    "#F6EAD5",
+    "#F7EBD8",
+    "#BE967F"
+  ],
+  "maps": {
+    "albedo": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs-v2\\pbr\\leaf\\leaf_albedo.png",
+      "url": "leaf_albedo.png",
+      "channel": "albedo",
+      "source": "reference-pixel-extraction"
+    },
+    "roughness": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs-v2\\pbr\\leaf\\leaf_roughness.png",
+      "url": "leaf_roughness.png",
+      "channel": "roughness",
+      "source": "reference-pixel-extraction"
+    },
+    "height": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs-v2\\pbr\\leaf\\leaf_height.png",
+      "url": "leaf_height.png",
+      "channel": "height",
+      "source": "reference-pixel-extraction"
+    },
+    "normal": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs-v2\\pbr\\leaf\\leaf_normal.png",
+      "url": "leaf_normal.png",
+      "channel": "normal",
+      "source": "reference-pixel-extraction"
+    },
+    "ao": {
+      "path": "C:\\Users\\minaa\\OneDrive\\Documents\\Projects\\SeedJournal\\.img2threejs-v2\\pbr\\leaf\\leaf_ao.png",
+      "url": "leaf_ao.png",
+      "channel": "ao",
+      "source": "reference-pixel-extraction"
+    }
+  },
+  "diagnostics": {
+    "sourceWidth": 418,
+    "sourceHeight": 418,
+    "mapSize": 512,
+    "cropBBoxPixels": {
+      "x": 0,
+      "y": 0,
+      "width": 418,
+      "height": 418
+    },
+    "mask": {
+      "backgroundColor": "#F1E5D0",
+      "backgroundNoise": 9.849,
+      "transparentPixelFraction": 0.0,
+      "foregroundCoverage": 1.0
+    },
+    "mapStats": {
+      "valueRange": 0.08,
+      "heightP90Gradient": 0.02924,
+      "roughnessBase": 0.715,
+      "roughnessVariation": 0.05,
+      "normalStrength": 0.191,
+      "blurRadius": 10
+    },
+    "palette": [
+      "#F1E4CF",
+      "#F3E8D3",
+      "#F6EAD5",
+      "#F7EBD8",
+      "#BE967F"
+    ]
+  },
+  "warnings": [
+    "foreground mask is tiny; material extraction is likely unreliable",
+    "image is not clearly isolated from background; using most pixels as material evidence",
+    "object/background separation is weak",
+    "single-image inverse rendering cannot prove true physical PBR; confidence is capped",
+    "low value range weakens height/roughness inference"
+  ],
+  "limitation": "single-image PBR extraction is an estimate; 70%+ extraction confidence still needs render screenshot review"
+}

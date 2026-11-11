@@ -1,0 +1,411 @@
+/* Welcome — same craft dialect as unlocked product (tokens, poetic type, dark CTA). */
+
+.sj-welcome {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 100svh;
+  overflow: hidden;
+  /* Local press, quieter than the product 0.97 spring. */
+  --sj-press-scale: 0.98;
+  padding:
+    max(1.5rem, env(safe-area-inset-top))
+    max(1.25rem, env(safe-area-inset-right))
+    max(2rem, env(safe-area-inset-bottom))
+    max(1.25rem, env(safe-area-inset-left));
+  color: var(--sj-color-text, var(--color-text-primary));
+  /* Soft product garden sky — same family as living stage, not sterile void. */
+  background:
+    radial-gradient(circle at 50% 16%, rgb(255 246 240 / 90%), transparent 44%),
+    radial-gradient(ellipse 70% 50% at 50% 92%, rgb(232 200 196 / 18%), transparent 58%),
+    linear-gradient(165deg, #f7f0e8 0%, #f0e5d9 48%, #e8d9d0 100%);
+}
+
+.sj-welcome__sky {
+  position: absolute;
+  inset: -6%;
+  pointer-events: none;
+  animation: sj-welcome-sky 72s ease-in-out infinite alternate;
+  background:
+    radial-gradient(
+      circle at 78% 32%,
+      color-mix(in srgb, var(--sj-color-blossom-light, #f7d4de) 18%, transparent),
+      transparent 24rem
+    ),
+    radial-gradient(
+      circle at 72% 82%,
+      color-mix(in srgb, var(--sj-color-blossom, #e8a4b4) 10%, transparent),
+      transparent 28rem
+    );
+}
+
+/* Living companion — full-bleed at every width. The stone stays centered in the canvas. */
+.sj-welcome__garden {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  display: grid;
+  place-items: stretch;
+  opacity: 1;
+}
+
+.sj-welcome__garden-mount {
+  position: absolute;
+  inset: 0;
+  width: auto;
+  height: auto;
+  overflow: hidden;
+  opacity: 1;
+  animation: sj-welcome-garden-enter 1.1s var(--sj-ease-enter, cubic-bezier(0.22, 1, 0.36, 1)) both;
+}
+
+.sj-welcome__garden-mount [data-living-sakura-scene],
+.sj-welcome__garden-mount canvas {
+  position: absolute !important;
+  inset: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+
+.sj-welcome__garden-fallback {
+  position: absolute;
+  inset: 0;
+  border-radius: 0;
+  background:
+    radial-gradient(
+      circle at 50% 48%,
+      color-mix(in srgb, var(--sj-color-blossom-light, #f7d4de) 36%, transparent),
+      transparent 46%
+    );
+  opacity: 1;
+}
+
+.sj-welcome__nav {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.sj-welcome__wordmark {
+  font-family: var(--sj-font-poetic, var(--font-poetic));
+  font-size: clamp(1.65rem, 4vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.sj-welcome__privacy {
+  margin-top: 0.35rem;
+  color: var(--sj-color-text-muted, var(--color-text-secondary));
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  text-decoration: none;
+}
+
+.sj-welcome__privacy:hover {
+  color: var(--sj-color-text, var(--color-text-primary));
+}
+
+.sj-welcome__privacy:focus-visible {
+  outline: 2px solid var(--sj-color-focus, var(--color-focus));
+  outline-offset: 3px;
+}
+
+.sj-welcome__ghost {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding: 0 1rem;
+  border: 1px solid var(--sj-color-border, var(--color-border));
+  border-radius: var(--sj-radius-control, var(--radius-control));
+  color: inherit;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition:
+    background-color var(--sj-motion-hover, 160ms) ease,
+    transform var(--sj-motion-press, 100ms) var(--sj-ease-press, ease);
+}
+
+.sj-welcome__ghost:hover {
+  background: var(--color-surface-raised);
+}
+
+.sj-welcome__ghost:active {
+  transform: scale(var(--sj-press-scale, 0.97));
+}
+
+.sj-welcome__ghost:focus-visible {
+  outline: 2px solid var(--sj-color-focus, var(--color-focus));
+  outline-offset: 2px;
+}
+
+.sj-welcome__hero {
+  position: relative;
+  z-index: 1;
+  align-self: end;
+  justify-self: center;
+  width: min(100%, 28rem);
+  max-width: 28rem;
+  margin: 0;
+  padding-block: 1.5rem max(2rem, env(safe-area-inset-bottom));
+  text-align: center;
+}
+
+@media (max-width: 48rem) {
+  .sj-welcome__hero {
+    width: min(100%, 28rem);
+    max-width: none;
+  }
+
+  .sj-welcome__garden,
+  .sj-welcome__garden-mount {
+    inset: 0;
+    left: 0;
+    opacity: 1;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+}
+
+.sj-welcome__eyebrow,
+.sj-welcome__hero h1,
+.sj-welcome__lede,
+.sj-welcome__auth {
+  animation: sj-welcome-rise 720ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.sj-welcome__eyebrow {
+  animation-delay: 0ms;
+}
+
+.sj-welcome__hero h1 {
+  animation-delay: 120ms;
+}
+
+.sj-welcome__lede {
+  animation-delay: 240ms;
+}
+
+.sj-welcome__auth {
+  animation-delay: 380ms;
+}
+
+@keyframes sj-welcome-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.4rem);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes sj-welcome-sky {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-1.75%, 1.1%, 0);
+  }
+}
+
+@keyframes sj-welcome-pending {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes sj-welcome-garden-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(1.2rem, 0.4rem, 0) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.sj-welcome__eyebrow {
+  margin: 0 0 1.15rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sj-color-text-muted, var(--color-text-secondary));
+}
+
+.sj-welcome__hero h1 {
+  margin: 0 auto;
+  max-width: 12ch;
+  font-family: var(--sj-font-poetic, var(--font-poetic));
+  font-size: clamp(2.6rem, 7vw, 4.25rem);
+  font-weight: 400;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  text-align: center;
+  text-wrap: balance;
+  text-shadow: 0 1px 18px rgb(247 240 232 / 88%);
+}
+
+.sj-welcome__lede {
+  margin: 1.65rem 0 0;
+  max-width: 34rem;
+  font-size: clamp(1.05rem, 2.2vw, 1.125rem);
+  line-height: 1.55;
+  color: var(--sj-color-text-muted, var(--color-text-secondary));
+}
+
+/* Product-primary dialect: dark moon fill + blossom-light label. */
+.sj-welcome__cta {
+  display: inline-flex;
+  min-height: 3.5rem;
+  align-items: center;
+  margin-top: 2.25rem;
+  padding: 0 1.4rem;
+  border: 1px solid var(--sj-color-moon, #26332d);
+  border-radius: 999px;
+  color: var(--sj-color-blossom-light, #f7d4de);
+  background: var(--sj-color-moon, #26332d);
+  font-size: 0.95rem;
+  font-weight: 620;
+  text-decoration: none;
+  box-shadow:
+    0 0.75rem 2.25rem rgb(38 51 45 / 14%),
+    inset 0 1px 0 rgb(255 255 255 / 12%);
+  transition:
+    opacity var(--sj-motion-hover, 160ms) ease,
+    transform var(--sj-motion-press, 100ms) var(--sj-ease-press, ease);
+}
+
+.sj-welcome__cta:hover {
+  opacity: 0.94;
+}
+
+.sj-welcome .sj-welcome__cta:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.sj-welcome .sj-welcome__cta:active:disabled {
+  transform: none;
+}
+
+.sj-welcome .sj-welcome__cta:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.sj-welcome .sj-welcome__cta:focus-visible,
+.sj-welcome .sj-welcome__ghost:focus-visible {
+  outline: 2px solid
+    color-mix(in srgb, var(--sj-color-blossom-shadow, var(--color-focus)) 72%, transparent);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px
+    color-mix(in srgb, var(--sj-color-blossom, var(--color-blossom)) 22%, transparent);
+}
+
+.sj-welcome__auth {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  margin-top: 1.75rem;
+}
+
+.sj-welcome__google {
+  display: flex;
+  justify-content: center;
+  width: min(100%, 20rem);
+  min-height: 3.5rem;
+}
+
+.sj-welcome__cta {
+  justify-content: center;
+  width: min(100%, 20rem);
+  margin-top: 0;
+}
+
+.sj-welcome__cta--apple {
+  color: #1a1a1a;
+  background: #fff;
+  border-color: rgb(26 26 26 / 18%);
+}
+
+.sj-welcome__auth[aria-busy="true"] .sj-welcome__google {
+  pointer-events: none;
+  opacity: 0.72;
+}
+
+.sj-welcome__status {
+  margin: 0.15rem 0 0;
+  color: var(--sj-color-text-muted, var(--color-text-secondary));
+  font-size: 0.875rem;
+  line-height: 1.45;
+  animation: sj-welcome-pending 2.6s ease-in-out infinite;
+}
+
+.sj-welcome__error {
+  margin: 0;
+  max-width: 28rem;
+  color: #8a3b3b;
+  font-size: 0.875rem;
+}
+
+.sj-welcome__footnote {
+  margin: 0.4rem 0 0;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--sj-color-text-muted, var(--color-text-secondary));
+}
+
+/* Privacy already carries the encryption note. Do not repeat it under sign-in. */
+.sj-welcome__auth > .sj-welcome__footnote:last-child {
+  display: none;
+}
+
+@media (min-width: 40rem) {
+  .sj-welcome {
+    padding-inline: max(2rem, env(safe-area-inset-left))
+      max(2rem, env(safe-area-inset-right));
+  }
+}
+
+@media (min-width: 64rem) {
+  .sj-welcome {
+    padding-inline: max(4rem, env(safe-area-inset-left))
+      max(4rem, env(safe-area-inset-right));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sj-welcome__eyebrow,
+  .sj-welcome__hero h1,
+  .sj-welcome__lede,
+  .sj-welcome__auth,
+  .sj-welcome__hero,
+  .sj-welcome__garden-mount,
+  .sj-welcome__sky,
+  .sj-welcome__status {
+    animation: none;
+    transform: none;
+  }
+
+  .sj-welcome .sj-welcome__cta:active,
+  .sj-welcome .sj-welcome__ghost:active {
+    transform: none;
+  }
+
+  .sj-welcome__status {
+    opacity: 1;
+  }
+}

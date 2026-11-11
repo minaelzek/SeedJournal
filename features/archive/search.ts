@@ -1,5 +1,6 @@
 import type { PromptCategory } from "@/lib/contracts";
 import type { DecryptedJournalEntry } from "@/features/journal";
+import { monthDayFromLocalDay } from "@/features/growth/onThisDay";
 
 export interface ArchiveFilters {
   query?: string;
@@ -7,6 +8,11 @@ export interface ArchiveFilters {
   tag?: string;
   from?: number;
   to?: number;
+  /**
+   * When set (YYYY-MM-DD), keep entries that share that calendar month-day
+   * (On This Day rediscovery). Does not require the same year.
+   */
+  onThisDayLocalDay?: string;
 }
 
 function normalize(value: string): string {
@@ -47,6 +53,10 @@ export function searchEntries(
     .filter(Boolean);
   const normalizedTag = normalize(filters.tag ?? "");
 
+  const onThisDayKey = filters.onThisDayLocalDay
+    ? monthDayFromLocalDay(filters.onThisDayLocalDay)
+    : null;
+
   return entries
     .filter((entry) => {
       const completedAt =
@@ -66,6 +76,12 @@ export function searchEntries(
       ) {
         return false;
       }
+      if (onThisDayKey) {
+        const entryDay =
+          (entry.localDay && monthDayFromLocalDay(entry.localDay)) ||
+          monthDayFromCompletedAt(completedAt);
+        if (entryDay !== onThisDayKey) return false;
+      }
       if (terms.length > 0) {
         const haystack = searchableText(entry);
         if (!terms.every((term) => haystack.includes(term))) return false;
@@ -78,6 +94,18 @@ export function searchEntries(
           (left.completedAt ?? left.updatedAt) ||
         right.id.localeCompare(left.id),
     );
+}
+
+function monthDayFromCompletedAt(completedAt: number): string | null {
+  try {
+    const date = new Date(completedAt);
+    if (Number.isNaN(date.getTime())) return null;
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${month}-${day}`;
+  } catch {
+    return null;
+  }
 }
 
 export function collectArchiveTags(

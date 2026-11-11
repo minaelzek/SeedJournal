@@ -48,44 +48,57 @@ export function SeedJournalHeader({
       </div>
       <div className="sj-header__end">
         {weather ? (
-          <p
-            className="sj-header__weather"
-            title={weather.description}
-            aria-label={`Garden weather: ${weather.label}. ${weather.description}`}
-          >
-            <span aria-hidden />
-            {weather.label}
-          </p>
+          <>
+            <p
+              className="sj-header__weather"
+              data-weather={weather.kind}
+              title={weather.description}
+            >
+              <span aria-hidden />
+              {weather.label}
+            </p>
+            <p className="sr-only">
+              Garden weather: {weather.label}. {weather.description}
+            </p>
+          </>
         ) : null}
-        <nav className="sj-header__actions" aria-label="Journal controls">
-          <button
-            className="sj-icon-button"
-            type="button"
-            onClick={onOpenArchive}
-            aria-label="Open journal archive"
-            title="Journal archive"
-          >
-            <BookOpenTextIcon aria-hidden />
-          </button>
-          <button
-            className="sj-icon-button"
-            type="button"
-            onClick={onLock}
-            aria-label="Lock journal"
-            title="Lock journal"
-          >
-            <LockSimpleIcon aria-hidden />
-          </button>
-          <button
-            className="sj-icon-button"
-            type="button"
-            onClick={onOpenSettings}
-            aria-label="Open settings"
-            title="Settings"
-          >
-            <GearSixIcon aria-hidden />
-          </button>
-        </nav>
+        {onOpenArchive || onLock || onOpenSettings ? (
+          <nav className="sj-header__actions" aria-label="Journal controls">
+            {onOpenArchive ? (
+              <button
+                className="sj-icon-button"
+                type="button"
+                onClick={onOpenArchive}
+                aria-label="Open journal archive"
+                title="Journal archive"
+              >
+                <BookOpenTextIcon aria-hidden />
+              </button>
+            ) : null}
+            {onLock ? (
+              <button
+                className="sj-icon-button"
+                type="button"
+                onClick={onLock}
+                aria-label="Lock journal"
+                title="Lock journal"
+              >
+                <LockSimpleIcon aria-hidden />
+              </button>
+            ) : null}
+            {onOpenSettings ? (
+              <button
+                className="sj-icon-button"
+                type="button"
+                onClick={onOpenSettings}
+                aria-label="Open settings"
+                title="Settings"
+              >
+                <GearSixIcon aria-hidden />
+              </button>
+            ) : null}
+          </nav>
+        ) : null}
       </div>
     </header>
   );

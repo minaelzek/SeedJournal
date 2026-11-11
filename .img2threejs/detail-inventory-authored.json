@@ -1,0 +1,17 @@
+{
+  "sourceImage": "C:\\Users\\minaa\\.codex\\generated_images\\019fce16-1e89-75a0-98c5-38d5ba139e51\\exec-d749cf74-2ed7-4e7b-a38b-bf7edd901190.png",
+  "scanMethod": "grid-3x3 plus direct visual inspection",
+  "targetMinDetails": 10,
+  "details": [
+    {"id":"trunk-taper-faceted-bark","mapsTo":"trunk.localFeatures","confidence":0.96},
+    {"id":"root-flare","mapsTo":"root-flare.localFeatures","confidence":0.88},
+    {"id":"scaffold-branch-arch","mapsTo":"primary-scaffolds.localFeatures","confidence":0.95},
+    {"id":"alternating-lateral-branching","mapsTo":"secondary-branches.localFeatures","confidence":0.90},
+    {"id":"fine-twiglets","mapsTo":"twiglets.localFeatures","confidence":0.87},
+    {"id":"open-canopy-gaps","mapsTo":"canopy-voids.localFeatures","confidence":0.93},
+    {"id":"five-petal-blossoms","mapsTo":"blossom-clusters.localFeatures","confidence":0.91},
+    {"id":"blossom-distribution","mapsTo":"blossom-clusters.localFeatures","confidence":0.89},
+    {"id":"emerging-leaves","mapsTo":"leaf-sprigs.localFeatures","confidence":0.86},
+    {"id":"fallen-petals","mapsTo":"ground-petal-accents.localFeatures","confidence":0.80}
+  ]
+}

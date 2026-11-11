@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import {
   ArrowRightIcon,
   FlowerLotusIcon,
@@ -8,7 +8,10 @@ import {
 } from "@phosphor-icons/react";
 import {
   careInvitation,
-  careRhythmDetail,
+  gentleCareNoteCopy,
+  nextNamedGrowth,
+  readGentleCareNoteEnabled,
+  selectOnThisDayMemories,
   type CareRhythm,
   type DueReturnBud,
 } from "@/features/growth";
@@ -19,6 +22,12 @@ import {
   type GardenMemoryRecord,
 } from "@/features/garden/MemoryNavigator";
 import { SeedJournalHeader } from "./SeedJournalHeader";
+import {
+  FIRST_OPEN_ARRIVAL_MS,
+  FIRST_OPEN_BEATS,
+  FIRST_OPEN_STORAGE_KEY,
+  shouldPlayFirstOpenArrival,
+} from "./firstOpenArrival";
 import "./shell.css";
 
 export interface TreeFirstHomeProps {
@@ -39,6 +48,8 @@ export interface TreeFirstHomeProps {
   onRevisitEntry?: (entryId: string) => void;
   selectedEntryId?: string | null;
   onSelectEntry?: (entryId: string | null) => void;
+  /** Journal card is open over this same page. Keep the tree; hide the dock. */
+  companionOpen?: boolean;
 }
 
 export function TreeFirstHome({
@@ -59,6 +70,7 @@ export function TreeFirstHome({
   onRevisitEntry,
   selectedEntryId = null,
   onSelectEntry,
+  companionOpen = false,
 }: TreeFirstHomeProps) {
   const growthUnits = snapshot.events.reduce(
     (total, event) => total + event.growthUnits,
@@ -69,48 +81,140 @@ export function TreeFirstHome({
   const isSeed = growthUnits === 0;
   const tendedToday = careRhythm?.tendedToday ?? false;
   const hasReturnBud = Boolean(returnBud);
+  const nextGrowth = nextNamedGrowth(reflectionCount);
   const invitation = careInvitation({
     hasBegun,
     hasUnfinishedReflection,
     hasReturnBud,
     reflectionCount,
     rhythm: careRhythm,
+    nextChangeLabel: nextGrowth?.label,
   });
   // Body copy only for first visit / draft — never over the living tree.
   const showWelcomeCopy =
     invitation.state === "first" || invitation.state === "draft";
 
+  const todayLocalDay =
+    careRhythm?.days.find((day) => day.isToday)?.localDay ??
+    new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  const onThisDay = selectOnThisDayMemories(memories, todayLocalDay, {
+    excludeToday: true,
+    limit: 3,
+  });
+
+  const [gentleCareEnabled, setGentleCareEnabled] = useState(false);
+  const [arrivalPlaying, setArrivalPlaying] = useState(false);
+  useEffect(() => {
+    setGentleCareEnabled(readGentleCareNoteEnabled());
+  }, []);
+  useLayoutEffect(() => {
+    if (!isSeed || hasBegun) {
+      setArrivalPlaying(false);
+      return;
+    }
+    const reducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    let alreadySeen = false;
+    try {
+      alreadySeen = sessionStorage.getItem(FIRST_OPEN_STORAGE_KEY) === "1";
+    } catch {
+      alreadySeen = false;
+    }
+    const arriveQuery =
+      typeof window !== "undefined" &&
+      new URLSearchParams(window.location.search).get("arrive") === "1";
+    if (
+      !shouldPlayFirstOpenArrival({
+        isSeed,
+        alreadySeen,
+        arriveQuery,
+        reducedMotion,
+      })
+    ) {
+      setArrivalPlaying(false);
+      return;
+    }
+    setArrivalPlaying(true);
+    const doneTimer = window.setTimeout(() => {
+      setArrivalPlaying(false);
+      try {
+        sessionStorage.setItem(FIRST_OPEN_STORAGE_KEY, "1");
+      } catch {
+        // sessionStorage may be blocked; the film simply will not persist.
+      }
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("arrive")) {
+        url.searchParams.delete("arrive");
+        const next = `${url.pathname}${url.search}${url.hash}`;
+        window.history.replaceState({}, "", next);
+      }
+    }, FIRST_OPEN_ARRIVAL_MS);
+    return () => {
+      window.clearTimeout(doneTimer);
+    };
+  }, [hasBegun, isSeed]);
+  const gentleCareNote = gentleCareNoteCopy({
+    enabled: gentleCareEnabled,
+    hasBegun,
+    tendedToday,
+    hasUnfinishedReflection,
+  });
+
+  const quietChrome = arrivalPlaying || companionOpen;
+  const showDockTitle = arrivalPlaying || invitation.state === "first";
+  const dockTitle = arrivalPlaying
+    ? FIRST_OPEN_BEATS[0].title
+    : invitation.title;
+
   return (
     <>
       <SeedJournalHeader
-        onOpenArchive={onOpenArchive}
-        onOpenSettings={onOpenSettings}
-        onLock={onLock}
-        weather={hasBegun ? weather : undefined}
+        onOpenArchive={quietChrome ? undefined : onOpenArchive}
+        onOpenSettings={quietChrome ? undefined : onOpenSettings}
+        onLock={quietChrome ? undefined : onLock}
+        weather={arrivalPlaying || !hasBegun ? undefined : weather}
       />
       <main
         className="sj-home"
-        id="main-content"
+        id={companionOpen ? undefined : "main-content"}
+        aria-hidden={companionOpen || undefined}
+        data-conversing={companionOpen || undefined}
         data-has-draft={hasUnfinishedReflection || undefined}
         data-tended-today={tendedToday || undefined}
         data-care-state={invitation.state}
         data-return-bud={hasReturnBud || undefined}
         data-tree-clear={!showWelcomeCopy || undefined}
+        data-first-open={arrivalPlaying || undefined}
       >
-        {/* Top strip: one short line only — tree owns the rest. */}
-        <section className="sj-home__welcome" aria-labelledby="sj-home-title">
-          <p className="sj-home__eyebrow">{invitation.eyebrow}</p>
-          <h1 id="sj-home-title">{invitation.title}</h1>
-          {showWelcomeCopy ? (
-            <p className="sj-home__description">{invitation.description}</p>
-          ) : (
-            <p className="sr-only">{invitation.description}</p>
-          )}
-        </section>
+        {/* Top strip after the arrival beat — tree owns the rest.
+            First visit keeps its one line in the dock, with the button. */}
+        {arrivalPlaying || invitation.state === "first" ? null : (
+          <section
+            className="sj-home__welcome"
+            aria-labelledby="sj-home-title"
+          >
+            {invitation.eyebrow ? (
+              <p className="sj-home__eyebrow">{invitation.eyebrow}</p>
+            ) : null}
+            <h1 id="sj-home-title">{invitation.title}</h1>
+            {invitation.description ? (
+              showWelcomeCopy ? (
+                <p className="sj-home__description">{invitation.description}</p>
+              ) : (
+                <p className="sr-only">{invitation.description}</p>
+              )
+            ) : null}
+          </section>
+        )}
 
         {/*
-          Open stage — tree is rendered by AppFrame IllustratedSakura.
-          No CSS seed companion: the illustrated sakura owns seed personality.
+          Open stage — the living Sakura is rendered by AppFrame (gardenRenderer = "living").
+          This slot keeps layout clearance only; the tree owns presence and personality.
         */}
         <div
           className="sj-home__tree-stage"
@@ -119,7 +223,14 @@ export function TreeFirstHome({
         />
 
         {memories.length > 0 ? (
-          <div className="sj-home__memory-control">
+          <div
+            className="sj-home__memory-control"
+            data-memory-selected={selectedEntryId ? "true" : undefined}
+          >
+            {/*
+              Garden petal taps set selectedEntryId in SeedJournalApp/AppFrame.
+              MemoryNavigator opens the petal viewer for that entry (no body in 3D).
+            */}
             <MemoryNavigator
               memories={memories}
               selectedEntryId={selectedEntryId}
@@ -130,19 +241,70 @@ export function TreeFirstHome({
           </div>
         ) : null}
 
-        {/* Bottom dock: rhythm + single primary path. */}
+        {/*
+          Bottom dock system — single safe-area stack so return bud, On This Day,
+          care rhythm, and primary CTA never absolute-collide on ~375px.
+        */}
         <div className="sj-home__dock">
-          {hasBegun && careRhythm ? (
-            <CareRhythmMark rhythm={careRhythm} />
+          {showDockTitle ? (
+            <h1 id="sj-home-title" className="sj-home__arrival">
+              {dockTitle}
+            </h1>
+          ) : null}
+          {arrivalPlaying ? null : onThisDay.length > 0 && !hasReturnBud ? (
+            <section
+              className="sj-on-this-day"
+              aria-label="On this day in your journal"
+            >
+              <p className="sj-on-this-day__kicker">On this day</p>
+              <p className="sj-on-this-day__lede">
+                Past care returns — without a streak to keep.
+              </p>
+              <ul className="sj-on-this-day__list">
+                {onThisDay.map((memory) => {
+                  const ordinal = memory.journalOrdinal;
+                  return (
+                    <li key={memory.eventId}>
+                      <button
+                        type="button"
+                        className="sj-on-this-day__item"
+                        onClick={() => onSelectEntry?.(memory.entryId)}
+                      >
+                        <span className="sj-on-this-day__title">
+                          {memory.title || "A quiet reflection"}
+                        </span>
+                        <span className="sj-on-this-day__meta">
+                          {ordinal ? `Journal ${ordinal}` : "Memory petal"}
+                          <span aria-hidden="true"> · </span>
+                          {memory.dateLabel}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
           ) : null}
 
-          {hasReturnBud && returnBud && onOpenReturnBud && onReleaseReturnBud ? (
+          {!arrivalPlaying &&
+          hasReturnBud &&
+          returnBud &&
+          onOpenReturnBud &&
+          onReleaseReturnBud ? (
             <ReturnBudMoment
               bud={returnBud}
               onOpen={onOpenReturnBud}
               onRelease={onReleaseReturnBud}
             />
-          ) : (
+          ) : null}
+
+          {!arrivalPlaying &&
+          !(
+            hasReturnBud &&
+            returnBud &&
+            onOpenReturnBud &&
+            onReleaseReturnBud
+          ) ? (
             <div className="sj-home__actions">
               <button
                 className="sj-journal-cta"
@@ -154,19 +316,38 @@ export function TreeFirstHome({
                 <span>{invitation.ctaLabel}</span>
                 <ArrowRightIcon aria-hidden />
               </button>
-              {tendedToday && !hasUnfinishedReflection ? (
-                <p className="sj-home__settled" aria-live="polite">
-                  Care complete for today
-                </p>
-              ) : null}
             </div>
-          )}
-
-          {!hasReturnBud ? (
-            <p className="sj-home__footnote">{invitation.footnote}</p>
           ) : null}
 
-          {hasUnfinishedReflection && onStartFreshJournal ? (
+          {!arrivalPlaying &&
+          !hasReturnBud &&
+          (gentleCareNote ||
+            invitation.footnote ||
+            invitation.state === "first" ||
+            invitation.state === "open") ? (
+            <p className="sj-home__footnote">
+              {gentleCareNote ? (
+                <>
+                  {gentleCareNote}
+                  {invitation.footnote ? (
+                    <>
+                      <span aria-hidden="true"> · </span>
+                      {invitation.footnote}
+                    </>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  {invitation.footnote}
+                  {invitation.state === "first" || invitation.state === "open"
+                    ? " A small seed is enough."
+                    : null}
+                </>
+              )}
+            </p>
+          ) : null}
+
+          {!arrivalPlaying && hasUnfinishedReflection && onStartFreshJournal ? (
             <button
               type="button"
               className="sj-home__fresh-start"
@@ -239,35 +420,4 @@ function ReturnBudMoment({
   );
 }
 
-function CareRhythmMark({ rhythm }: { rhythm: CareRhythm }) {
-  const detail = careRhythmDetail(rhythm);
-  const openToday = !rhythm.tendedToday;
 
-  return (
-    <div
-      className="sj-care-rhythm"
-      data-tended-today={rhythm.tendedToday || undefined}
-      data-open-today={openToday || undefined}
-      data-rhythm={rhythm.currentRhythm > 0 ? rhythm.currentRhythm : undefined}
-      aria-label={`Care rhythm: ${rhythm.recentCareDays} of the last seven days. ${
-        rhythm.tendedToday ? "Today is tended." : "Today is open."
-      } ${detail}.`}
-    >
-      <span className="sj-care-rhythm__days" aria-hidden="true">
-        {rhythm.days.map((day) => (
-          <span
-            className="sj-care-rhythm__day"
-            data-tended={day.tended || undefined}
-            data-today={day.isToday || undefined}
-            data-open={day.isToday && !day.tended ? true : undefined}
-            key={day.localDay}
-            title={day.fullLabel}
-          >
-            <i />
-          </span>
-        ))}
-      </span>
-      <span className="sj-care-rhythm__detail">{detail}</span>
-    </div>
-  );
-}

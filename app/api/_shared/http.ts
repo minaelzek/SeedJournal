@@ -3,8 +3,10 @@ import type { ApiError } from "@/lib/contracts";
 
 const JSON_CONTENT_TYPE = "application/json; charset=utf-8";
 export const CSRF_COOKIE = "__Host-seedjournal-csrf";
+export const CSRF_COOKIE_DEV = "seedjournal-csrf";
 export const CSRF_HEADER = "x-seedjournal-csrf";
 export const MAX_JSON_BODY_BYTES = 400 * 1024;
+export const REQUEST_ID_HEADER = "X-Request-ID";
 
 export class ApiRouteError extends Error {
   constructor(
@@ -21,12 +23,50 @@ export function apiJson(
   body: unknown,
   init: ResponseInit = {},
 ): Response {
-  const headers = new Headers(init.headers);
+  const headers = copyHeadersPreservingSetCookie(init.headers);
   headers.set("Content-Type", JSON_CONTENT_TYPE);
   headers.set("Cache-Control", "private, no-store");
   headers.set("Pragma", "no-cache");
   headers.set("X-Content-Type-Options", "nosniff");
   return new Response(JSON.stringify(body), { ...init, headers });
+}
+
+function copyHeadersPreservingSetCookie(
+  init: HeadersInit | undefined,
+): Headers {
+  const headers = new Headers();
+  if (!init) return headers;
+  // One Set-Cookie string is one cookie. Headers.set and a combined value
+  // drop every cookie after the first, so each cookie is appended alone.
+  if (hasSetCookieList(init)) {
+    init.forEach((value, key) => {
+      if (key === "set-cookie") return;
+      headers.append(key, value);
+    });
+    for (const cookie of init.getSetCookie()) {
+      headers.append("Set-Cookie", cookie);
+    }
+    return headers;
+  }
+  if (Array.isArray(init)) {
+    for (const [key, value] of init) {
+      headers.append(key, value);
+    }
+    return headers;
+  }
+  for (const [key, value] of Object.entries(init)) {
+    headers.append(key, value);
+  }
+  return headers;
+}
+
+function hasSetCookieList(
+  init: HeadersInit,
+): init is Headers {
+  return (
+    typeof (init as Headers).getSetCookie === "function" &&
+    typeof (init as Headers).forEach === "function"
+  );
 }
 
 export function apiError(
@@ -51,26 +91,45 @@ export function withApi<T extends unknown[]>(
   handler: (...args: T) => Promise<Response>,
 ): (...args: T) => Promise<Response> {
   return async (...args: T) => {
+    const request = args[0] instanceof Request ? args[0] : undefined;
+    const requestId = crypto.randomUUID();
     try {
-      return await handler(...args);
+      const response = await handler(...args);
+      response.headers.set(REQUEST_ID_HEADER, requestId);
+      return response;
     } catch (error) {
-      return apiError(error);
+      logApiFailure(request, error, requestId);
+      return apiError(error, requestId);
     }
   };
+}
+
+function csrfCookieName(): string {
+  return process.env.NODE_ENV === "production" ? CSRF_COOKIE : CSRF_COOKIE_DEV;
 }
 
 export function issueCsrf(request: Request): {
   token: string;
   setCookie: string | null;
 } {
-  const current = readCookie(request.headers.get("cookie"), CSRF_COOKIE);
+  const header = request.headers.get("cookie");
+  const current =
+    readCookie(header, CSRF_COOKIE) ?? readCookie(header, CSRF_COOKIE_DEV);
   if (current && isCsrfToken(current)) {
     return { token: current, setCookie: null };
   }
   const token = randomBase64Url(32);
+  const secure = process.env.NODE_ENV === "production";
+  const parts = [
+    `${csrfCookieName()}=${token}`,
+    "Path=/",
+    "SameSite=Strict",
+    "Max-Age=43200",
+  ];
+  if (secure) parts.push("Secure");
   return {
     token,
-    setCookie: `${CSRF_COOKIE}=${token}; Path=/; Secure; SameSite=Strict; Max-Age=43200`,
+    setCookie: parts.join("; "),
   };
 }
 
@@ -103,10 +162,10 @@ export async function assertSafeMutation(request: Request): Promise<void> {
     );
   }
 
-  const cookieToken = readCookie(
-    request.headers.get("cookie"),
-    CSRF_COOKIE,
-  );
+  const cookieHeader = request.headers.get("cookie");
+  const cookieToken =
+    readCookie(cookieHeader, CSRF_COOKIE) ??
+    readCookie(cookieHeader, CSRF_COOKIE_DEV);
   const headerToken = request.headers.get(CSRF_HEADER);
   if (
     !cookieToken ||
@@ -181,7 +240,43 @@ function errorResponse(
   requestId: string,
 ): Response {
   const body: ApiError = { error: { code, message }, requestId };
-  return apiJson(body, { status });
+  return apiJson(body, {
+    status,
+    headers: { [REQUEST_ID_HEADER]: requestId },
+  });
+}
+
+function logApiFailure(
+  request: Request | undefined,
+  error: unknown,
+  requestId: string,
+): void {
+  const status =
+    error instanceof AuthenticationRequiredError
+      ? 401
+      : error instanceof ApiRouteError
+        ? error.status
+        : 500;
+  const code =
+    error instanceof AuthenticationRequiredError
+      ? "authentication_required"
+      : error instanceof ApiRouteError
+        ? error.code
+        : "internal_error";
+  const record = {
+    event: "api_error",
+    requestId,
+    method: request?.method ?? "UNKNOWN",
+    path: request ? new URL(request.url).pathname : "unknown",
+    status,
+    code,
+    errorName: error instanceof Error ? error.name : "UnknownError",
+  };
+  if (status >= 500) {
+    console.error("[seed-journal] api_error", record);
+  } else {
+    console.warn("[seed-journal] api_error", record);
+  }
 }
 
 function readCookie(header: string | null, name: string): string | null {

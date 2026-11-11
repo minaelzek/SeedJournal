@@ -2,45 +2,49 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 export type ChatGPTUser = {
-  displayName: string;
-  email: string;
-  fullName: string | null;
+  subjectId: string;
+  email?: string;
+  displayName?: string;
 };
 
+const USER_ID_HEADER = "oai-authenticated-user-id";
 const USER_EMAIL_HEADER = "oai-authenticated-user-email";
 const USER_FULL_NAME_HEADER = "oai-authenticated-user-full-name";
 const USER_FULL_NAME_ENCODING_HEADER =
   "oai-authenticated-user-full-name-encoding";
 const PERCENT_ENCODED_UTF8 = "percent-encoded-utf-8";
+export const LOCAL_PREVIEW_SUBJECT_ID = "local-preview-user";
 const SIGN_IN_PATH = "/signin-with-chatgpt";
 const SIGN_OUT_PATH = "/signout-with-chatgpt";
 const CALLBACK_PATH = "/callback";
 
 export async function getChatGPTUser(): Promise<ChatGPTUser | null> {
   const requestHeaders = await headers();
-  const email = requestHeaders.get(USER_EMAIL_HEADER);
-  if (!email) {
+  const subjectId = requestHeaders.get(USER_ID_HEADER)?.trim();
+  if (!subjectId) {
     if (process.env.NODE_ENV === "development") {
       return {
+        subjectId: LOCAL_PREVIEW_SUBJECT_ID,
         displayName: "Local gardener",
         email: "local-preview@seedjournal.invalid",
-        fullName: "Local gardener",
       };
     }
     return null;
   }
 
+  const email = requestHeaders.get(USER_EMAIL_HEADER)?.trim() || undefined;
   const encodedFullName = requestHeaders.get(USER_FULL_NAME_HEADER);
-  const fullName =
+  const decodedFullName =
     encodedFullName &&
     requestHeaders.get(USER_FULL_NAME_ENCODING_HEADER) === PERCENT_ENCODED_UTF8
       ? safeDecodeURIComponent(encodedFullName)
       : null;
+  const displayName = decodedFullName?.trim() || email;
 
   return {
-    displayName: fullName ?? email,
-    email,
-    fullName,
+    subjectId,
+    ...(email ? { email } : {}),
+    ...(displayName ? { displayName } : {}),
   };
 }
 

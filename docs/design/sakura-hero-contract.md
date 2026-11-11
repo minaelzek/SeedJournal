@@ -1,15 +1,24 @@
 # Sakura Hero Contract
 
-**Status:** frozen for illustration-first overhaul  
+**Status:** product default = Living Sakura v2; seed mark if WebGL is unavailable  
 **Product:** Seed Journal  
-**Bar:** Duolingo delight × Apple craft  
+**Bar:** 100k MMR — Duolingo delight × Meta product craft × Apple restraint × Japanese zen stage  
 **Species:** Japanese flowering cherry (*Prunus serrulata*), stylized for UI
 
 ---
 
+## Product renderer (code truth)
+
+| Tier | When |
+|------|------|
+| **Living Sakura v2** | Product default (`AppFrame` `gardenRenderer="living"`) |
+| **Static seed mark** | WebGL unavailable / context lost / living error |
+
+Lab renderers (legacy WebGL, img2threejs) are diagnostic only — never re-promoted as hero.
+
 ## One sentence
 
-A living **sakura** sits at the center of Seed Journal; tender entries fill it gently, and deep insight opens **pink life** in a celebration you feel without reading.
+A living **sakura** sits at the center of Seed Journal; every intentional journal grows the same companion; nurture is witnessed as botanical ceremony — never streaks, XP, or grades.
 
 ---
 
@@ -23,16 +32,21 @@ A living **sakura** sits at the center of Seed Journal; tender entries fill it g
 | Leaves | Soft green, **secondary** once blooming stages begin |
 | Trunk | Warm umber–greige bark, thick enough at phone size |
 | Canopy | Cloud-like sakura mass — not sparse L-system sticks |
-| Ground | Soft soil / mist disc |
-| Motion | Gentle sway, petal drift; celebration = bloom unfurl + canopy expand |
+| Ground | Zen micro-stage: soft soil mound + gravel wash (never a toy root ball) |
+| Memory petals | On wood via short pedicel; equal beauty; never free-air float |
+| Motion | Hierarchical wind + attention breath; ceremony = path → wood → organs → settle |
 
 ### Forbidden
 
 - Generic leafy oak / maple / pine  
 - Leaf-dominant mature silhouettes  
-- Dead-stick early progress  
+- Dead-stick early progress / barren single trunk after first care  
+- Dodecahedron / ball root props under the trunk  
+- Floating memory petals off wood  
 - XP bars, scoreboards, confetti that hides the tree  
+- Grade-ladder UI language (leaf → bud → blossom ranking)  
 - Emoji cherry as the hero mark  
+- Sterile product void without garden stage  
 
 ### Palette (maps to CSS tokens)
 
@@ -105,15 +119,19 @@ Easing: enter `cubic-bezier(0.22, 1, 0.36, 1)`.
 
 ---
 
-## Implementation status (2026-07-31 overhaul)
+## Implementation status (2026-08-06)
 
 | Surface | Status |
 |---------|--------|
-| Presentation model (knobs, counts, morph intents) | Shipped — aggressive early density |
-| IllustratedSakura v2 (filled trunk, pink canopy, seed character) | Shipped — product default |
-| GrowthReveal morph theater | Shipped — before→after + leap petals |
-| AppFrame illustration default | Shipped (`gardenRenderer="illustration"`) |
-| Care copy sakura language | Shipped |
-| WebGL demotion | Behind `gardenRenderer="webgl"` only |
+| Living Sakura v2 product garden | **Product default** (`gardenRenderer="living"`) |
+| Growth reveal on same Canvas | Shipped — `revealMode` on home body + hostGarden overlay |
+| Full ceremony (path → wood → organs) | In progress — schedule applied to real path/organs |
+| Seed mark (`GardenFallback`) | Last resort when WebGL is unavailable |
+| Founder still-pack visual YES | Open — see `living-sakura-still-pack.md` |
+| Care copy sakura language | Shipped; equal-beauty flourish copy (no grade ladder) |
 
-**Still polishable:** hand-tuned Rive/Lottie, device screenshot matrix, further Three.js code-split.
+**Still polishable:** sapling+ adult mesh firm-YES, courtyard materials, presence/reunion, dock collisions.
+
+**Life chapters (2026-08-14):** journals 0–11 are a seed / tender sprout, not a scaled mature vase. Adult topology begins at the sapling gate (12).
+
+**Auth (2026-08-14):** Google + Apple session sign-in is the product path. Passphrase vault is no longer shown. Welcome should show the same seed as first-open.

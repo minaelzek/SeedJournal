@@ -9,8 +9,16 @@ export {
   selectReflectionTarget,
   stripOpeningPrompt,
 } from "./engine";
+export {
+  composeGardenReply,
+  pageIsHeavy,
+  quotedSpan,
+} from "./compose";
+export type { ComposedLine, ComposeKind } from "./compose";
 export { selectDailyOpeningPrompt, selectFollowUp } from "./follow-up";
 export type { SelectedFollowUp } from "./follow-up";
+export { extractWritingScene, isSceneFollowUpId } from "./scene";
+export type { WritingScene, SceneQuestion } from "./scene";
 export { growthForEntry, mapReflectionToGrowth } from "./growth";
 export type { GrowthResult } from "./growth";
 export { seededIndex, stableHash } from "./hash";
